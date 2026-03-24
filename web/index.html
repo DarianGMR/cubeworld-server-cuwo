@@ -1,68 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>cuwo - Panel Web</title>
-    <link rel="stylesheet" href="css/normalize.min.css">
-    <link rel="stylesheet" href="css/bootstrap-responsive.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuwo - Panel de Control</title>
     <link rel="stylesheet" href="css/style.css">
-    <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; }
-        .container-fluid { padding: 20px; }
-        .nav { list-style: none; padding: 0; }
-        .nav li { cursor: pointer; padding: 10px; background: #ddd; margin: 5px 0; border-radius: 4px; }
-        .nav li.current_tab { background: #0084B4; color: white; }
-        table { width: 100%; border-collapse: collapse; }
-        table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        table th { background: #0084B4; color: white; }
-        .hidden_tab { display: none !important; }
-        #chatMessages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: white; margin-bottom: 10px; }
-        #chatInput { width: 100%; padding: 10px; }
-        .reconnecting { color: red; font-weight: bold; }
-        .logo { max-width: 150px; margin: 20px 0; }
-    </style>
+    <link rel="stylesheet" href="css/all.min.css">
+    <script src="js/jquery-2.0.3.min.js"></script>
 </head>
 <body>
-<div class="container-fluid">
-    <div class="row-fluid">
-        <div class="span3">
-            <img class="logo" src="img/logo.png" alt="cuwo">
-            <div>
-                <ul class="nav">
-                    <li data-name="Players" class="current_tab">Jugadores</li>
-                    <li data-name="Chat">Chat</li>
-                </ul>
-                <span class="reconnecting"></span>
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo">
+                    <i class="fas fa-cube"></i>
+                </div>
+                <h1>CUWO</h1>
+                <p>Panel de Control</p>
             </div>
-        </div>
-        <div class="span9 content_container">
-            <div id="Players" class="span12">
-                <h2>Jugadores Conectados</h2>
-                <table class="table players">
-                    <thead>
-                    <tr>
-                        <th>#ID</th>
-                        <th>Nombre</th>
-                        <th>Nivel</th>
-                        <th>Clase</th>
-                        <th>Especializacion</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-tab="players">
+                    <i class="fas fa-users"></i>
+                    <span>Jugadores</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="server">
+                    <i class="fas fa-server"></i>
+                    <span>Servidor</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="console">
+                    <i class="fas fa-terminal"></i>
+                    <span>Consola</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="chat">
+                    <i class="fas fa-comments"></i>
+                    <span>Chat</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="config">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuración</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>Status: <span class="status-badge online">Online</span></p>
             </div>
-            <div id="Chat" class="span12 hidden_tab">
-                <h2>Chat del Servidor</h2>
-                <div id="chatMessages"></div>
-                <input type="text" id="chatInput" placeholder="Escribe tu mensaje...">
-            </div>
-        </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Jugadores Tab -->
+            <section id="players" class="tab-content active">
+                <div class="section-header">
+                    <h2><i class="fas fa-users"></i> Jugadores Conectados</h2>
+                    <div class="header-stats">
+                        <div class="stat">
+                            <span class="stat-value" id="playerCount">0</span>
+                            <span class="stat-label">Conectados</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">100</span>
+                            <span class="stat-label">Máximo</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="players-grid" id="playersContainer">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No hay jugadores conectados</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Servidor Tab -->
+            <section id="server" class="tab-content">
+                <div class="section-header">
+                    <h2><i class="fas fa-server"></i> Estado del Servidor</h2>
+                </div>
+                
+                <div class="server-info">
+                    <div class="info-card">
+                        <h3>Información General</h3>
+                        <div class="info-item">
+                            <span>Estado:</span>
+                            <span class="status-badge online">Online</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Puerto:</span>
+                            <span>12345</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Tiempo Online:</span>
+                            <span id="uptime">0 horas</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Jugadores:</span>
+                            <span id="serverPlayers">0/100</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Consola Tab -->
+            <section id="console" class="tab-content">
+                <div class="section-header">
+                    <h2><i class="fas fa-terminal"></i> Consola</h2>
+                </div>
+                
+                <div class="console-container">
+                    <div class="console-output" id="consoleOutput">
+                        <div class="console-line"><span class="console-success">✓</span> Servidor web conectado</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Chat Tab -->
+            <section id="chat" class="tab-content">
+                <div class="section-header">
+                    <h2><i class="fas fa-comments"></i> Chat del Servidor</h2>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-message system">
+                            <span class="message-author">SISTEMA</span>
+                            <span class="message-text">Chat de servidor iniciado</span>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chatInput" placeholder="Escribe tu mensaje..." class="chat-input">
+                        <button class="chat-send-btn" id="chatSendBtn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Configuración Tab -->
+            <section id="config" class="tab-content">
+                <div class="section-header">
+                    <h2><i class="fas fa-cog"></i> Configuración</h2>
+                </div>
+                
+                <div class="config-container">
+                    <div class="config-card">
+                        <h3>Próximamente</h3>
+                        <p>Las opciones de configuración estarán disponibles en futuras actualizaciones.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
-</div>
-
-<script src="js/jquery-2.0.3.min.js"></script>
-<script src="js/init.js"></script>
-<script src="js/interface.js"></script>
+    
+    <script src="js/init.js"></script>
+    <script src="js/interface.js"></script>
 </body>
 </html>
