@@ -1,0 +1,206 @@
+div {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    height: 100%;
+    min-width: 500px;
+}
+
+.logo {
+    display: block;
+    margin: 0px auto 20px;
+}
+
+.container-fluid {
+    margin: 0;
+    padding: 20px 0 0;
+}
+.hidden_tab{
+    display: none !important;
+}
+.table {
+    margin-bottom: 20px;
+    padding-right: 40px;
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+.table th,
+.table td {
+    padding: 8px;
+    width: 20%;
+    border-top: 1px solid #dddddd;
+    vertical-align: top;
+    text-align: left;
+    line-height: 20px;
+}
+
+.table th {
+    font-weight: bold;
+}
+
+.table thead th {
+    vertical-align: bottom;
+}
+
+.table tbody tr:hover > td,
+.table tbody tr:hover > th {
+    background-color: #f5f5f5;
+}
+
+.info > span {
+    float: left;
+}
+
+.chosen_player, .player_controls {
+    background-color: #f5f5f5;
+}
+
+.player_controls td .btn {
+    margin-right: 1em;
+}
+
+.btn {
+    display: inline-block;
+    margin-bottom: 5px;
+    padding: 4px 12px;
+    border: 1px solid #cccccc;
+    border-color: #e6e6e6 #e6e6e6 #bfbfbf;
+    border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);
+    border-bottom-color: #b3b3b3;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+    background-image: -moz-linear-gradient(top, #ffffff, #e6e6e6);
+    background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#ffffff), to(#e6e6e6));
+    background-image: -webkit-linear-gradient(top, #ffffff, #e6e6e6);
+    background-image: -o-linear-gradient(top, #ffffff, #e6e6e6);
+    background-image: linear-gradient(to bottom, #ffffff, #e6e6e6);
+    background-repeat: repeat-x;
+    -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+    -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+    color: #333333;
+    vertical-align: middle;
+    text-align: center;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
+    font-size: 14px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.btn:hover,
+.btn:focus,
+.btn:active {
+    background: #e6e6e6 0 -15px;
+    color: #333333;
+    text-decoration: none;
+    -webkit-transition: background-position 0.1s linear;
+    -moz-transition: background-position 0.1s linear;
+    -o-transition: background-position 0.1s linear;
+    transition: background-position 0.1s linear;
+}
+
+input[type="text"] {
+    padding-left: 3px;
+    height: 1.6em;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    vertical-align: middle;
+}
+
+.nav {
+    margin: 0;
+    padding-left: 4px;
+    height: 100%;
+    background: #08c;
+    color: #fff;
+    list-style: none;
+    overflow: hidden;
+}
+
+.nav li {
+    padding: 5px 1px 5px 10px;
+    border-left: #08c solid 3px;
+}
+
+.nav > li:hover {
+    background: #08c;
+    border-left: #dd1144 solid 3px;
+    cursor: pointer;
+}
+
+.nav > li:active, .nav >li.current_tab {
+    border-left: #5eb95e solid 3px;
+}
+
+.nav li{
+    color: #fff;
+    display: block;
+    padding-left: 4px;
+    width: 100%;
+}
+
+.container-fluid {
+    height: 100%;
+}
+
+#Chat {
+    height: 25em;
+    margin-left: 0;
+
+}
+#ChatWrap{
+    height: 23em;
+}
+#chatMessages {
+    border: #ddd solid 1px;
+    height: 23em;
+    float: left;
+    width: 80%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+#chatMessages > p {
+    margin: 0.2em;
+}
+
+#serverPlayers {
+    margin-left: 0;
+    border: #ddd solid 1px;
+    border-left: 0;
+    height: 23em;
+    width: 20%;
+    float: left;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+#serverPlayers > p{
+    margin: 0.2em;
+}
+#chatInput {
+    border-radius: 0;
+    border: #ddd solid 1px;
+    border-top: 0;
+    width: 100%;
+    display: block;
+    height: 2em;
+    padding-left: 0.2em;
+    box-sizing: border-box;
+}
+
+@media (max-width: 979px) and (min-width: 768px) {
+
+}
+
+@media (min-width: 1200px) {
+
+}

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>cuwo - Panel Web</title>
+    <link rel="stylesheet" href="css/normalize.min.css">
+    <link rel="stylesheet" href="css/bootstrap-responsive.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; }
+        .container-fluid { padding: 20px; }
+        .nav { list-style: none; padding: 0; }
+        .nav li { cursor: pointer; padding: 10px; background: #ddd; margin: 5px 0; border-radius: 4px; }
+        .nav li.current_tab { background: #0084B4; color: white; }
+        table { width: 100%; border-collapse: collapse; }
+        table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        table th { background: #0084B4; color: white; }
+        .hidden_tab { display: none !important; }
+        #chatMessages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: white; margin-bottom: 10px; }
+        #chatInput { width: 100%; padding: 10px; }
+        .reconnecting { color: red; font-weight: bold; }
+        .logo { max-width: 150px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row-fluid">
+        <div class="span3">
+            <img class="logo" src="img/logo.png" alt="cuwo">
+            <div>
+                <ul class="nav">
+                    <li data-name="Players" class="current_tab">Jugadores</li>
+                    <li data-name="Chat">Chat</li>
+                </ul>
+                <span class="reconnecting"></span>
+            </div>
+        </div>
+        <div class="span9 content_container">
+            <div id="Players" class="span12">
+                <h2>Jugadores Conectados</h2>
+                <table class="table players">
+                    <thead>
+                    <tr>
+                        <th>#ID</th>
+                        <th>Nombre</th>
+                        <th>Nivel</th>
+                        <th>Clase</th>
+                        <th>Especializacion</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+            <div id="Chat" class="span12 hidden_tab">
+                <h2>Chat del Servidor</h2>
+                <div id="chatMessages"></div>
+                <input type="text" id="chatInput" placeholder="Escribe tu mensaje...">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/jquery-2.0.3.min.js"></script>
+<script src="js/init.js"></script>
+<script src="js/interface.js"></script>
+</body>
+</html>
