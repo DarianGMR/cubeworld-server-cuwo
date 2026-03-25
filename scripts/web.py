@@ -340,34 +340,28 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     if connection:
                         try:
                             player_name = connection.name
-                            player_ip = connection.address[0]
-                            
-                            # Usar el comando ban del servidor directamente
-                            # El comando ban() del script de ban necesita: script, nombre_jugador, razón
                             banned = False
                             
-                            # Intentar usar el comando /ban del servidor
+                            # Intentar banear por nombre usando el nuevo comando /ban
                             try:
-                                # Llamar al ban command directamente
                                 result = server.call_command(None, 'ban', [player_name, reason])
-                                if result:
-                                    banned = True
-                                    logger.info(f"[BAN] Jugador {player_name} (ID: {player_id}) baneado via comando. Razón: {reason}")
+                                banned = True
+                                logger.info(f"[BAN] Jugador {player_name} (ID: {player_id}) baneado correctamente. Razón: {reason}")
                             except Exception as cmd_error:
-                                logger.debug(f"Error con comando ban: {cmd_error}")
+                                logger.debug(f"Error con comando ban por nombre: {cmd_error}")
                             
-                            # Si falla el comando, intentar acceder directamente al script de ban
+                            # Si falla, intentar acceder directamente al script de ban
                             if not banned:
                                 try:
                                     for script_name, script in server.scripts.scripts.items():
                                         if 'ban' in script_name.lower():
-                                            if hasattr(script, 'ban'):
-                                                script.ban(player_ip, reason)
+                                            if hasattr(script, 'ban_player'):
+                                                script.ban_player(player_name, reason)
                                                 banned = True
-                                                logger.info(f"[BAN] Jugador {player_name} baneado por IP: {player_ip}. Razón: {reason}")
+                                                logger.info(f"[BAN] Jugador {player_name} baneado directamente por nombre. Razón: {reason}")
                                                 break
                                 except Exception as ban_error:
-                                    logger.debug(f"Error con script ban directo: {ban_error}")
+                                    logger.debug(f"Error baneando por nombre directo: {ban_error}")
                             
                             if banned:
                                 response_msg["success"] = True
@@ -379,7 +373,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     pass
                             else:
                                 # Si no se pudo banear, al menos expulsarlo
-                                response_msg["error"] = "No se encontró script de ban, expulsando en su lugar"
+                                response_msg["error"] = "No se pudo banear al jugador, expulsando en su lugar"
                                 connection.kick(reason)
                                 logger.warning(f"No se pudo banear a {player_name}, solo expulsado")
                                 
