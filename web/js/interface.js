@@ -50,7 +50,17 @@ $(document).ready(function () {
         }
     });
     
-    // ============= PLAYERS UPDATE =============
+    // ============= CONVERT PLAYTIME =============
+    function formatPlaytime(minutes) {
+        if (minutes < 60) {
+            return minutes + ' min';
+        }
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours + 'h ' + mins + 'min';
+    }
+    
+    // ============= PLAYERS UPDATE - FIXED VERSION =============
     function updatePlayers() {
         $.ajax({
             url: '/api/players',
@@ -61,17 +71,37 @@ $(document).ready(function () {
                     return;
                 }
                 
-                playersData = {};
-                const html = [];
-                
+                // En lugar de reemplazar toda la lista, actualizar elementos existentes
                 if (data.players.length === 0) {
-                    html.push(`
-                        <div class="empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <p>No hay jugadores conectados</p>
-                        </div>
-                    `);
+                    if ($('#playersContainer .player-item').length === 0) {
+                        $('#playersContainer').html(`
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>No hay jugadores conectados</p>
+                            </div>
+                        `);
+                    }
                 } else {
+                    // Mostrar mensaje vacío solo si está actualmente mostrado
+                    const emptyState = $('#playersContainer .empty-state');
+                    if (emptyState.length > 0) {
+                        emptyState.remove();
+                    }
+                    
+                    // Crear un mapa de jugadores actuales
+                    const serverPlayerIds = new Set(data.players.map(p => p.id));
+                    
+                    // Remover jugadores que ya no están en el servidor
+                    $('#playersContainer .player-item').each(function() {
+                        const itemPlayerId = $(this).data('player-id');
+                        if (!serverPlayerIds.has(itemPlayerId)) {
+                            $(this).fadeOut(300, function() {
+                                $(this).remove();
+                            });
+                        }
+                    });
+                    
+                    // Actualizar o agregar jugadores
                     data.players.forEach(player => {
                         playersData[player.id] = player;
                         
@@ -80,52 +110,80 @@ $(document).ready(function () {
                             ? Specializations[player.klass - 1][player.specialz] || "Desconocida"
                             : "Desconocida";
                         
-                        const firstLetter = (player.name || "?")[0].toUpperCase();
+                        const playtimeStr = formatPlaytime(player.playtime_minutes || 0);
                         
-                        html.push(`
-                            <div class="player-item">
-                                <div class="player-avatar">${firstLetter}</div>
-                                <div class="player-info">
-                                    <div class="player-name">${player.name} (ID: ${player.id})</div>
-                                    <div class="player-details-row">
-                                        <div class="player-detail-item">
-                                            <span class="player-detail-label">Clase</span>
-                                            <span class="player-detail-value">${className}</span>
-                                        </div>
-                                        <div class="player-detail-item">
-                                            <span class="player-detail-label">Especialización</span>
-                                            <span class="player-detail-value">${spec}</span>
-                                        </div>
-                                        <div class="player-detail-item">
-                                            <span class="player-detail-label">Salud</span>
-                                            <span class="player-detail-value">${player.hp} HP</span>
-                                        </div>
-                                        <div class="player-detail-item">
-                                            <span class="player-detail-label">Posición</span>
-                                            <span class="player-detail-value">X:${player.x || 0}</span>
+                        const $existingItem = $(`#playersContainer .player-item[data-player-id="${player.id}"]`);
+                        
+                        if ($existingItem.length > 0) {
+                            // Actualizar elemento existente sin parpadeo
+                            $existingItem.find('.player-detail-value').each(function(index) {
+                                const $label = $(this).siblings('.player-detail-label');
+                                const label = $label.text().toLowerCase();
+                                
+                                if (label.includes('salud')) {
+                                    $(this).text(player.hp + ' HP');
+                                } else if (label.includes('especialización')) {
+                                    $(this).text(spec);
+                                } else if (label.includes('posición')) {
+                                    $(this).text(`X:${player.x || 0}`);
+                                } else if (label.includes('tiempo')) {
+                                    $(this).text(playtimeStr);
+                                }
+                            });
+                        } else {
+                            // Crear nuevo elemento
+                            const firstLetter = (player.name || "?")[0].toUpperCase();
+                            
+                            const newItem = `
+                                <div class="player-item" data-player-id="${player.id}">
+                                    <div class="player-avatar">${firstLetter}</div>
+                                    <div class="player-info">
+                                        <div class="player-name">${player.name} (ID: ${player.id})</div>
+                                        <div class="player-details-row">
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">Clase</span>
+                                                <span class="player-detail-value">${className}</span>
+                                            </div>
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">Especialización</span>
+                                                <span class="player-detail-value">${spec}</span>
+                                            </div>
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">Salud</span>
+                                                <span class="player-detail-value">${player.hp} HP</span>
+                                            </div>
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">Posición</span>
+                                                <span class="player-detail-value">X:${player.x || 0}</span>
+                                            </div>
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">Tiempo</span>
+                                                <span class="player-detail-value">${playtimeStr}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                    <div class="player-actions">
+                                        <button class="btn-action btn-heal" data-player-id="${player.id}" data-action="heal">
+                                            <i class="fas fa-heart"></i> Sanar
+                                        </button>
+                                        <button class="btn-action btn-kick" data-player-id="${player.id}" data-action="kick">
+                                            <i class="fas fa-sign-out-alt"></i> Expulsar
+                                        </button>
+                                        <button class="btn-action btn-ban" data-player-id="${player.id}" data-action="ban">
+                                            <i class="fas fa-ban"></i> Banear
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="player-actions">
-                                    <button class="btn-action btn-heal" data-player-id="${player.id}" data-action="heal">
-                                        <i class="fas fa-heart"></i> Sanar
-                                    </button>
-                                    <button class="btn-action btn-kick" data-player-id="${player.id}" data-action="kick">
-                                        <i class="fas fa-sign-out-alt"></i> Expulsar
-                                    </button>
-                                    <button class="btn-action btn-ban" data-player-id="${player.id}" data-action="ban">
-                                        <i class="fas fa-ban"></i> Banear
-                                    </button>
-                                </div>
-                            </div>
-                        `);
+                            `;
+                            
+                            $('#playersContainer').append(newItem);
+                        }
                     });
                 }
                 
-                $('#playersContainer').html(html.join(''));
                 $('#playerCount').text(data.count);
                 
-                // Attach action handlers
+                // Reattach action handlers para nuevos elementos
                 attachPlayerActionHandlers();
                 
             },
@@ -136,7 +194,8 @@ $(document).ready(function () {
     }
     
     function attachPlayerActionHandlers() {
-        $('.btn-action').on('click', function() {
+        $('.btn-action').off('click').on('click', function(e) {
+            e.preventDefault();
             const playerId = $(this).data('player-id');
             const action = $(this).data('action');
             const player = playersData[playerId];
@@ -169,12 +228,14 @@ $(document).ready(function () {
                 player_id: playerId,
                 key: auth_key
             }),
-            success: function() {
+            success: function(response) {
                 addConsoleMessage('success', `Jugador ${playerName} sanado completamente`);
+                // Actualizar la lista de jugadores inmediatamente
                 updatePlayers();
             },
-            error: function() {
+            error: function(xhr) {
                 addConsoleMessage('error', `Error al sanar a ${playerName}`);
+                console.error('Error:', xhr);
             }
         });
     }
@@ -186,7 +247,8 @@ $(document).ready(function () {
             return;
         }
         
-        const playerName = playersData[selectedPlayerId].name;
+        const player = playersData[selectedPlayerId];
+        if (!player) return;
         
         $.ajax({
             url: '/api/command',
@@ -198,13 +260,14 @@ $(document).ready(function () {
                 reason: reason,
                 key: auth_key
             }),
-            success: function() {
-                addConsoleMessage('success', `Jugador ${playerName} expulsado. Razón: ${reason}`);
+            success: function(response) {
+                addConsoleMessage('success', `Jugador ${player.name} expulsado. Razón: ${reason}`);
                 hideModal('kickModal');
                 updatePlayers();
             },
-            error: function() {
-                addConsoleMessage('error', `Error al expulsar a ${playerName}`);
+            error: function(xhr) {
+                addConsoleMessage('error', `Error al expulsar a ${player.name}`);
+                console.error('Error:', xhr);
             }
         });
     });
@@ -216,7 +279,8 @@ $(document).ready(function () {
             return;
         }
         
-        const playerName = playersData[selectedPlayerId].name;
+        const player = playersData[selectedPlayerId];
+        if (!player) return;
         
         $.ajax({
             url: '/api/command',
@@ -228,13 +292,14 @@ $(document).ready(function () {
                 reason: reason,
                 key: auth_key
             }),
-            success: function() {
-                addConsoleMessage('success', `Jugador ${playerName} baneado. Razón: ${reason}`);
+            success: function(response) {
+                addConsoleMessage('success', `Jugador ${player.name} baneado. Razón: ${reason}`);
                 hideModal('banModal');
                 updatePlayers();
             },
-            error: function() {
-                addConsoleMessage('error', `Error al banear a ${playerName}`);
+            error: function(xhr) {
+                addConsoleMessage('error', `Error al banear a ${player.name}`);
+                console.error('Error:', xhr);
             }
         });
     });
@@ -337,10 +402,10 @@ $(document).ready(function () {
                         key: auth_key
                     }),
                     success: function() {
-                        $(this).val('');
                         addChatMessage('cuwo', message, 'user');
                     }
                 });
+                $(this).val('');
             }
             return false;
         }
@@ -372,10 +437,11 @@ $(document).ready(function () {
     updatePlayers();
     updateServerInfo();
     
+    // Cambiar de 2000ms a 5000ms (5 segundos) y mantener elementos sin parpadeo
     updateInterval = setInterval(() => {
         updatePlayers();
         updateServerInfo();
-    }, 2000);
+    }, 5000);
     
     // Clean up on unload
     $(window).on('unload', function() {
