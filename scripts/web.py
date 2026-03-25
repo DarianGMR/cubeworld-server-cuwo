@@ -340,28 +340,30 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     if connection:
                         try:
                             player_name = connection.name
+                            entity_id = connection.entity_id  # ← USAR entity_id
                             banned = False
                             
-                            # Intentar banear por nombre usando el nuevo comando /ban
+                            # Intentar banear al jugador ESPECÍFICO por su entity_id
                             try:
+                                # Llamar al ban command con el nombre (el comando lo convierte a entity_id)
                                 result = server.call_command(None, 'ban', [player_name, reason])
                                 banned = True
-                                logger.info(f"[BAN] Jugador {player_name} (ID: {player_id}) baneado correctamente. Razón: {reason}")
+                                logger.info(f"[BAN] Jugador {player_name} (Entity ID: {entity_id}) baneado correctamente. Razón: {reason}")
                             except Exception as cmd_error:
-                                logger.debug(f"Error con comando ban por nombre: {cmd_error}")
+                                logger.debug(f"Error con comando ban: {cmd_error}")
                             
                             # Si falla, intentar acceder directamente al script de ban
                             if not banned:
                                 try:
-                                    for script_name, script in server.scripts.scripts.items():
+                                    for script_name, script_obj in server.scripts.scripts.items():
                                         if 'ban' in script_name.lower():
-                                            if hasattr(script, 'ban_player'):
-                                                script.ban_player(player_name, reason)
+                                            if hasattr(script_obj, 'ban_player'):
+                                                script_obj.ban_player(entity_id, player_name, reason)
                                                 banned = True
-                                                logger.info(f"[BAN] Jugador {player_name} baneado directamente por nombre. Razón: {reason}")
+                                                logger.info(f"[BAN] Jugador {player_name} (Entity ID: {entity_id}) baneado directamente. Razón: {reason}")
                                                 break
                                 except Exception as ban_error:
-                                    logger.debug(f"Error baneando por nombre directo: {ban_error}")
+                                    logger.debug(f"Error baneando por entity_id: {ban_error}")
                             
                             if banned:
                                 response_msg["success"] = True
