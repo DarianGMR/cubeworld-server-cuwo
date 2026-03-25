@@ -17,6 +17,7 @@ $(document).ready(function () {
     let playersData = {};
     let updateInterval = null;
     let selectedPlayerId = null;
+    let previousPlayerIds = new Set();
     
     // ============= TAB SWITCHING =============
     $('.nav-item').on('click', function(e) {
@@ -71,7 +72,17 @@ $(document).ready(function () {
                     return;
                 }
                 
-                // En lugar de reemplazar toda la lista, actualizar elementos existentes
+                const currentPlayerIds = new Set(data.players.map(p => p.id));
+                const disconnectedIds = new Set([...previousPlayerIds].filter(id => !currentPlayerIds.has(id)));
+                
+                // Remover jugadores desconectados
+                disconnectedIds.forEach(playerId => {
+                    $(`#playersContainer .player-item[data-player-id="${playerId}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                    delete playersData[playerId];
+                });
+                
                 if (data.players.length === 0) {
                     if ($('#playersContainer .player-item').length === 0) {
                         $('#playersContainer').html(`
@@ -82,26 +93,11 @@ $(document).ready(function () {
                         `);
                     }
                 } else {
-                    // Mostrar mensaje vacío solo si está actualmente mostrado
                     const emptyState = $('#playersContainer .empty-state');
                     if (emptyState.length > 0) {
                         emptyState.remove();
                     }
                     
-                    // Crear un mapa de jugadores actuales
-                    const serverPlayerIds = new Set(data.players.map(p => p.id));
-                    
-                    // Remover jugadores que ya no están en el servidor
-                    $('#playersContainer .player-item').each(function() {
-                        const itemPlayerId = $(this).data('player-id');
-                        if (!serverPlayerIds.has(itemPlayerId)) {
-                            $(this).fadeOut(300, function() {
-                                $(this).remove();
-                            });
-                        }
-                    });
-                    
-                    // Actualizar o agregar jugadores
                     data.players.forEach(player => {
                         playersData[player.id] = player;
                         
@@ -115,23 +111,22 @@ $(document).ready(function () {
                         const $existingItem = $(`#playersContainer .player-item[data-player-id="${player.id}"]`);
                         
                         if ($existingItem.length > 0) {
-                            // Actualizar elemento existente sin parpadeo
-                            $existingItem.find('.player-detail-value').each(function(index) {
-                                const $label = $(this).siblings('.player-detail-label');
-                                const label = $label.text().toLowerCase();
+                            $existingItem.find('.player-detail-item').each(function() {
+                                const $label = $(this).find('.player-detail-label');
+                                const $value = $(this).find('.player-detail-value');
+                                const labelText = $label.text().toLowerCase();
                                 
-                                if (label.includes('salud')) {
-                                    $(this).text(player.hp + ' HP');
-                                } else if (label.includes('especialización')) {
-                                    $(this).text(spec);
-                                } else if (label.includes('posición')) {
-                                    $(this).text(`X:${player.x || 0}`);
-                                } else if (label.includes('tiempo')) {
-                                    $(this).text(playtimeStr);
+                                if (labelText.includes('salud')) {
+                                    $value.text(player.hp + ' HP');
+                                } else if (labelText.includes('especialización')) {
+                                    $value.text(spec);
+                                } else if (labelText.includes('posición')) {
+                                    $value.text(`X:${player.x || 0}`);
+                                } else if (labelText.includes('tiempo')) {
+                                    $value.text(playtimeStr);
                                 }
                             });
                         } else {
-                            // Crear nuevo elemento
                             const firstLetter = (player.name || "?")[0].toUpperCase();
                             
                             const newItem = `
@@ -182,13 +177,12 @@ $(document).ready(function () {
                 }
                 
                 $('#playerCount').text(data.count);
-                
-                // Reattach action handlers para nuevos elementos
+                previousPlayerIds = currentPlayerIds;
                 attachPlayerActionHandlers();
                 
             },
-            error: function() {
-                // Error silencioso, reintentar
+            error: function(xhr) {
+                addConsoleMessage('error', `Error al obtener lista de jugadores: ${xhr.status} ${xhr.statusText}`);
             }
         });
     }
@@ -229,13 +223,21 @@ $(document).ready(function () {
                 key: auth_key
             }),
             success: function(response) {
-                addConsoleMessage('success', `Jugador ${playerName} sanado completamente`);
-                // Actualizar la lista de jugadores inmediatamente
+                if (response.success) {
+                    addConsoleMessage('success', `Jugador ${playerName} sanado completamente`);
+                } else {
+                    addConsoleMessage('error', `Error al sanar a ${playerName}: ${response.error || 'Error desconocido'}`);
+                }
                 updatePlayers();
             },
             error: function(xhr) {
-                addConsoleMessage('error', `Error al sanar a ${playerName}`);
-                console.error('Error:', xhr);
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    addConsoleMessage('error', `Error al sanar (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
+                } catch(e) {
+                    addConsoleMessage('error', `Error de conexión al sanar: HTTP ${xhr.status}`);
+                }
+                console.error('Error details:', xhr);
             }
         });
     }
@@ -261,13 +263,22 @@ $(document).ready(function () {
                 key: auth_key
             }),
             success: function(response) {
-                addConsoleMessage('success', `Jugador ${player.name} expulsado. Razón: ${reason}`);
+                if (response.success) {
+                    addConsoleMessage('success', `Jugador ${player.name} expulsado. Razón: ${reason}`);
+                } else {
+                    addConsoleMessage('error', `No se pudo expulsar a ${player.name}: ${response.error || 'Error desconocido'}`);
+                }
                 hideModal('kickModal');
                 updatePlayers();
             },
             error: function(xhr) {
-                addConsoleMessage('error', `Error al expulsar a ${player.name}`);
-                console.error('Error:', xhr);
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    addConsoleMessage('error', `Error al expulsar (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
+                } catch(e) {
+                    addConsoleMessage('error', `Error de conexión al expulsar: HTTP ${xhr.status}`);
+                }
+                console.error('Error details:', xhr);
             }
         });
     });
@@ -293,13 +304,22 @@ $(document).ready(function () {
                 key: auth_key
             }),
             success: function(response) {
-                addConsoleMessage('success', `Jugador ${player.name} baneado. Razón: ${reason}`);
+                if (response.success) {
+                    addConsoleMessage('success', `Jugador ${player.name} baneado correctamente. Razón: ${reason}`);
+                } else {
+                    addConsoleMessage('warning', `${player.name} expulsado (no se pudo banear): ${response.error || 'Error desconocido'}`);
+                }
                 hideModal('banModal');
                 updatePlayers();
             },
             error: function(xhr) {
-                addConsoleMessage('error', `Error al banear a ${player.name}`);
-                console.error('Error:', xhr);
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    addConsoleMessage('error', `Error al banear (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
+                } catch(e) {
+                    addConsoleMessage('error', `Error de conexión al banear: HTTP ${xhr.status}`);
+                }
+                console.error('Error details:', xhr);
             }
         });
     });
@@ -319,8 +339,8 @@ $(document).ready(function () {
                 const minutes = Math.floor((data.uptime % 3600) / 60);
                 $('#uptime').text(hours + ' horas, ' + minutes + ' minutos');
             },
-            error: function() {
-                // Error silencioso
+            error: function(xhr) {
+                addConsoleMessage('error', `Error al obtener info del servidor: HTTP ${xhr.status}`);
             }
         });
     }
@@ -355,10 +375,19 @@ $(document).ready(function () {
                         key: auth_key
                     }),
                     success: function(response) {
-                        addConsoleMessage('success', 'Comando ejecutado');
+                        if (response.success) {
+                            addConsoleMessage('success', 'Comando ejecutado correctamente');
+                        } else {
+                            addConsoleMessage('error', `Error ejecutando comando: ${response.error || 'Error desconocido'}`);
+                        }
                     },
-                    error: function() {
-                        addConsoleMessage('error', 'Error al ejecutar comando');
+                    error: function(xhr) {
+                        try {
+                            const errorData = JSON.parse(xhr.responseText);
+                            addConsoleMessage('error', `Error de ejecución: ${errorData.error || 'Error desconocido'}`);
+                        } catch(e) {
+                            addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
+                        }
                     }
                 });
                 
@@ -381,7 +410,7 @@ $(document).ready(function () {
                     key: auth_key
                 }),
                 error: function() {
-                    // Error silencioso
+                    addConsoleMessage('error', 'Error al limpiar el log');
                 }
             });
         }
@@ -403,6 +432,9 @@ $(document).ready(function () {
                     }),
                     success: function() {
                         addChatMessage('cuwo', message, 'user');
+                    },
+                    error: function(xhr) {
+                        addConsoleMessage('error', `Error al enviar mensaje: HTTP ${xhr.status}`);
                     }
                 });
                 $(this).val('');
@@ -437,13 +469,11 @@ $(document).ready(function () {
     updatePlayers();
     updateServerInfo();
     
-    // Cambiar de 2000ms a 5000ms (5 segundos) y mantener elementos sin parpadeo
     updateInterval = setInterval(() => {
         updatePlayers();
         updateServerInfo();
     }, 5000);
     
-    // Clean up on unload
     $(window).on('unload', function() {
         if (updateInterval) {
             clearInterval(updateInterval);
