@@ -12,12 +12,14 @@ import json
 import time
 import logging
 import sys
+import traceback
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from cuwo.script import ServerScript
+from cuwo.script import ServerScript, ConnectionScript
 
 SITE_PATH = 'web'
+PLAYTIME_DATA_NAME = 'web_playtimes'
 
-# Configurar logging para capturar todos los errores
+# Configurar logging para capturar todos los errores con stack trace completo
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s: %(message)s',
@@ -28,6 +30,37 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class WebConnectionScript(ConnectionScript):
+    """Script para trackear tiempo de conexión de jugadores"""
+    
+    def on_join(self, event):
+        """Se ejecuta cuando un jugador entra al servidor"""
+        # Guardar el tiempo de entrada
+        self.connection.web_join_time = time.time()
+        logger.info(f"Registrado join_time para {self.connection.name}")
+    
+    def on_unload(self):
+        """Guardar tiempo de juego cuando el jugador se desconecta"""
+        try:
+            if hasattr(self.connection, 'web_join_time') and self.connection.name:
+                playtime_data = self.server.load_data(PLAYTIME_DATA_NAME, {})
+                player_name = self.connection.name.lower()
+                
+                # Calcular tiempo de juego en segundos
+                playtime_seconds = int(time.time() - self.connection.web_join_time)
+                
+                # Si el jugador ya tenía tiempo registrado, sumarle
+                if player_name in playtime_data:
+                    playtime_data[player_name] += playtime_seconds
+                else:
+                    playtime_data[player_name] = playtime_seconds
+                
+                self.server.save_data(PLAYTIME_DATA_NAME, playtime_data)
+                logger.info(f"Guardado tiempo de juego para {self.connection.name}: {playtime_data[player_name]} segundos")
+        except Exception as e:
+            logger.error(f"Error guardando tiempo de juego: {e}\n{traceback.format_exc()}")
 
 
 class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
@@ -84,14 +117,18 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         """Devolver lista de jugadores en JSON con tiempo de juego"""
         server = self.server.web_server.server
         players_list = []
+        current_time = time.time()
+        
+        # Cargar datos de playtime persistentes
+        playtime_data = server.load_data(PLAYTIME_DATA_NAME, {})
         
         try:
-            for connection in server.players.values():
+            for connection in list(server.players.values()):
                 try:
                     if not hasattr(connection, 'entity') or connection.entity is None:
                         continue
                     
-                    if not hasattr(connection, 'name'):
+                    if not hasattr(connection, 'name') or not connection.name:
                         continue
                     
                     entity = connection.entity
@@ -108,10 +145,13 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     
                     # Calcular tiempo de juego en minutos
                     playtime_minutes = 0
-                    if hasattr(connection, 'join_time'):
-                        playtime_minutes = int((time.time() - connection.join_time) / 60)
-                    elif hasattr(connection, 'playtime'):
-                        playtime_minutes = int(connection.playtime / 60)
+                    if hasattr(connection, 'web_join_time'):
+                        # Tiempo actual en esta sesión
+                        session_playtime = int((current_time - connection.web_join_time) / 60)
+                        # Tiempo anterior guardado
+                        player_name_lower = connection.name.lower()
+                        previous_playtime = int(playtime_data.get(player_name_lower, 0) / 60)
+                        playtime_minutes = session_playtime + previous_playtime
                     
                     player_data = {
                         'id': player_id,
@@ -129,11 +169,11 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     players_list.append(player_data)
                     
                 except (AttributeError, TypeError, ValueError) as e:
-                    logger.debug(f"Error procesando jugador: {e}")
+                    logger.debug(f"Error procesando jugador: {e}\n{traceback.format_exc()}")
                     continue
                     
         except Exception as e:
-            logger.error(f"Error en handle_players_api: {e}")
+            logger.error(f"Error en handle_players_api: {e}\n{traceback.format_exc()}")
         
         response_data = {
             'response': 'get_players',
@@ -162,7 +202,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                 'uptime': int(time.time() - self.server.web_server.start_time)
             }
         except Exception as e:
-            logger.error(f"Error en handle_server_api: {e}")
+            logger.error(f"Error en handle_server_api: {e}\n{traceback.format_exc()}")
             server_data = {
                 'response': 'server_info',
                 'name': 'Cuwo Server',
@@ -190,8 +230,29 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response.encode('utf-8'))
     
+    def find_player_by_id(self, server, player_id):
+        """Encontrar un jugador por su ID"""
+        try:
+            for connection in list(server.players.values()):
+                try:
+                    player_entity_id = None
+                    if hasattr(connection, 'entity') and connection.entity:
+                        if hasattr(connection.entity, 'player_id'):
+                            player_entity_id = connection.entity.player_id
+                        elif hasattr(connection.entity, 'id'):
+                            player_entity_id = connection.entity.id
+                    
+                    if player_entity_id == player_id or id(connection) % 10000 == player_id:
+                        return connection
+                except Exception as e:
+                    logger.debug(f"Error buscando jugador: {e}")
+        except Exception as e:
+            logger.error(f"Error en find_player_by_id: {e}\n{traceback.format_exc()}")
+        
+        return None
+    
     def handle_command(self, data):
-        """Procesar comandos - AHORA CON EJECUCIÓN REAL"""
+        """Procesar comandos - CON VERDADERA FUNCIONALIDAD"""
         server = self.server.web_server.server
         auth_key = self.server.web_server.auth_key
         
@@ -200,13 +261,12 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
         
         request = data.get('request')
-        response_msg = {"response": "Success"}
+        response_msg = {"response": "Success", "success": False, "error": None}
         
         try:
             if request == 'send_message':
                 message = data.get('message', '')
                 if message:
-                    # Formatear mensaje con prefijo "cuwo:"
                     formatted_msg = f"cuwo: {message}"
                     server.send_chat(formatted_msg)
                     chat_history = getattr(self.server.web_server, 'chat_history', [])
@@ -214,126 +274,129 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     if len(chat_history) > 100:
                         chat_history.pop(0)
                     logger.info(f"[CHAT] {formatted_msg}")
+                    response_msg["success"] = True
                     
             elif request == 'execute_command':
                 command = data.get('command', '').strip()
                 if command:
                     logger.info(f"[COMANDO] {command}")
-                    # Ejecutar comando en el servidor
                     try:
                         server.call_command(None, command.split()[0], command.split()[1:] if len(command.split()) > 1 else [])
+                        response_msg["success"] = True
                     except Exception as e:
-                        logger.warning(f"Error ejecutando comando: {e}")
+                        logger.error(f"Error ejecutando comando: {e}\n{traceback.format_exc()}")
+                        response_msg["success"] = False
+                        response_msg["error"] = str(e)
                     
             elif request == 'heal_player':
                 player_id = data.get('player_id')
                 if player_id is not None:
-                    # Buscar el jugador por ID y curarlo
-                    healed = False
-                    for connection in server.players.values():
+                    connection = self.find_player_by_id(server, player_id)
+                    if connection:
                         try:
-                            player_entity_id = None
                             if hasattr(connection, 'entity') and connection.entity:
-                                if hasattr(connection.entity, 'player_id'):
-                                    player_entity_id = connection.entity.player_id
-                                elif hasattr(connection.entity, 'id'):
-                                    player_entity_id = connection.entity.id
-                            
-                            if player_entity_id == player_id or id(connection) % 10000 == player_id:
-                                # Curar al jugador al máximo
-                                if hasattr(connection.entity, 'hp') and hasattr(connection.entity, 'max_hp'):
-                                    connection.entity.hp = connection.entity.max_hp
-                                    healed = True
-                                    logger.info(f"[ACCIÓN] Jugador {connection.name} (ID: {player_id}) sanado completamente")
+                                entity = connection.entity
+                                # Usar damage() con valor negativo para curar (como /heal)
+                                if hasattr(entity, 'damage'):
+                                    entity.damage(-1000)  # Valor negativo cura
+                                    response_msg["success"] = True
+                                    logger.info(f"[HEAL] Jugador {connection.name} (ID: {player_id}) sanado completamente")
                                     server.send_chat(f"{connection.name} ha sido sanado")
-                                break
+                                else:
+                                    response_msg["error"] = "Entidad no tiene método damage()"
+                                    logger.error(f"Error: entidad no tiene método damage()")
+                            else:
+                                response_msg["error"] = "Conexión sin entidad"
+                                logger.error(f"Error: conexión sin entidad")
                         except Exception as e:
-                            logger.debug(f"Error curando jugador: {e}")
-                    
-                    if not healed:
-                        logger.warning(f"No se pudo encontrar al jugador con ID {player_id}")
-                    
-                    response_msg["success"] = healed
+                            response_msg["error"] = str(e)
+                            logger.error(f"Error curando jugador: {e}\n{traceback.format_exc()}")
+                    else:
+                        response_msg["error"] = f"Jugador con ID {player_id} no encontrado"
+                        logger.warning(f"No se encontró jugador con ID {player_id}")
                     
             elif request == 'kick_player':
                 player_id = data.get('player_id')
                 reason = data.get('reason', 'Sin especificar')
                 if player_id is not None:
-                    # Buscar el jugador por ID y expulsarlo
-                    kicked = False
-                    for connection in list(server.players.values()):
+                    connection = self.find_player_by_id(server, player_id)
+                    if connection:
                         try:
-                            player_entity_id = None
-                            if hasattr(connection, 'entity') and connection.entity:
-                                if hasattr(connection.entity, 'player_id'):
-                                    player_entity_id = connection.entity.player_id
-                                elif hasattr(connection.entity, 'id'):
-                                    player_entity_id = connection.entity.id
-                            
-                            if player_entity_id == player_id or id(connection) % 10000 == player_id:
-                                # Expulsar al jugador
-                                connection.kick(reason)
-                                kicked = True
-                                logger.info(f"[EXPULSIÓN] Jugador {connection.name} (ID: {player_id}) expulsado. Razón: {reason}")
-                                break
+                            connection.kick(reason)
+                            response_msg["success"] = True
+                            logger.info(f"[KICK] Jugador {connection.name} (ID: {player_id}) expulsado. Razón: {reason}")
                         except Exception as e:
-                            logger.debug(f"Error expulsando jugador: {e}")
-                    
-                    if not kicked:
-                        logger.warning(f"No se pudo encontrar al jugador con ID {player_id}")
-                    
-                    response_msg["success"] = kicked
+                            response_msg["error"] = str(e)
+                            logger.error(f"Error expulsando jugador: {e}\n{traceback.format_exc()}")
+                    else:
+                        response_msg["error"] = f"Jugador con ID {player_id} no encontrado"
+                        logger.warning(f"No se encontró jugador con ID {player_id}")
                     
             elif request == 'ban_player':
                 player_id = data.get('player_id')
                 reason = data.get('reason', 'Sin especificar')
                 if player_id is not None:
-                    # Buscar el jugador por ID y banearlo
-                    banned = False
-                    for connection in list(server.players.values()):
+                    connection = self.find_player_by_id(server, player_id)
+                    if connection:
                         try:
-                            player_entity_id = None
-                            if hasattr(connection, 'entity') and connection.entity:
-                                if hasattr(connection.entity, 'player_id'):
-                                    player_entity_id = connection.entity.player_id
-                                elif hasattr(connection.entity, 'id'):
-                                    player_entity_id = connection.entity.id
+                            player_name = connection.name
+                            player_ip = connection.address[0]
                             
-                            if player_entity_id == player_id or id(connection) % 10000 == player_id:
-                                # Banear al jugador por IP
-                                player_ip = connection.address[0]
-                                
-                                # Llamar a la función ban del script de bans si existe
+                            # Usar el comando ban del servidor directamente
+                            # El comando ban() del script de ban necesita: script, nombre_jugador, razón
+                            banned = False
+                            
+                            # Intentar usar el comando /ban del servidor
+                            try:
+                                # Llamar al ban command directamente
+                                result = server.call_command(None, 'ban', [player_name, reason])
+                                if result:
+                                    banned = True
+                                    logger.info(f"[BAN] Jugador {player_name} (ID: {player_id}) baneado via comando. Razón: {reason}")
+                            except Exception as cmd_error:
+                                logger.debug(f"Error con comando ban: {cmd_error}")
+                            
+                            # Si falla el comando, intentar acceder directamente al script de ban
+                            if not banned:
                                 try:
-                                    for script in server.scripts.scripts.values():
-                                        if hasattr(script, 'parent') and hasattr(script.parent, 'ban'):
-                                            script.parent.ban(player_ip, reason)
-                                            banned = True
-                                            logger.info(f"[BANEO] Jugador {connection.name} (IP: {player_ip}) baneado. Razón: {reason}")
-                                            break
+                                    for script_name, script in server.scripts.scripts.items():
+                                        if 'ban' in script_name.lower():
+                                            if hasattr(script, 'ban'):
+                                                script.ban(player_ip, reason)
+                                                banned = True
+                                                logger.info(f"[BAN] Jugador {player_name} baneado por IP: {player_ip}. Razón: {reason}")
+                                                break
+                                except Exception as ban_error:
+                                    logger.debug(f"Error con script ban directo: {ban_error}")
+                            
+                            if banned:
+                                response_msg["success"] = True
+                                server.send_chat(f"{player_name} ha sido baneado")
+                                # Expulsar al jugador después de banearlo
+                                try:
+                                    connection.kick(reason)
                                 except:
                                     pass
+                            else:
+                                # Si no se pudo banear, al menos expulsarlo
+                                response_msg["error"] = "No se encontró script de ban, expulsando en su lugar"
+                                connection.kick(reason)
+                                logger.warning(f"No se pudo banear a {player_name}, solo expulsado")
                                 
-                                # Si no se pudo usar el script de ban, al menos lo expulsamos
-                                if not banned:
-                                    connection.kick(reason)
-                                    banned = True
-                                    logger.info(f"[BANEO] Jugador {connection.name} expulsado (intento de baneo). Razón: {reason}")
-                                break
                         except Exception as e:
-                            logger.debug(f"Error baneando jugador: {e}")
-                    
-                    if not banned:
-                        logger.warning(f"No se pudo encontrar al jugador con ID {player_id}")
-                    
-                    response_msg["success"] = banned
+                            response_msg["error"] = str(e)
+                            logger.error(f"Error baneando jugador: {e}\n{traceback.format_exc()}")
+                    else:
+                        response_msg["error"] = f"Jugador con ID {player_id} no encontrado"
+                        logger.warning(f"No se encontró jugador con ID {player_id}")
                     
             elif request == 'clear_log':
                 logger.info("[LOG] Log limpiado por admin")
+                response_msg["success"] = True
                 
         except Exception as e:
-            logger.error(f"Error procesando comando: {e}")
-            response_msg["success"] = False
+            response_msg["error"] = str(e)
+            logger.error(f"Error procesando comando {request}: {e}\n{traceback.format_exc()}")
         
         response = json.dumps(response_msg)
         self.send_response(200)
@@ -350,7 +413,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
 class WebServer(ServerScript):
     """Script del servidor web para cuwo"""
     
-    connection_class = None
+    connection_class = WebConnectionScript
     
     def on_load(self):
         """Se ejecuta cuando se carga el script"""
@@ -379,7 +442,7 @@ class WebServer(ServerScript):
                 try:
                     self.http_server.serve_forever()
                 except Exception as e:
-                    logger.error(f"Error en servidor web: {e}")
+                    logger.error(f"Error en servidor web: {e}\n{traceback.format_exc()}")
             
             web_thread = threading.Thread(target=run_web_server, daemon=True)
             web_thread.start()
@@ -388,7 +451,7 @@ class WebServer(ServerScript):
                 self.loop.call_later(1, lambda: self._open_browser(web_host, web_port))
         
         except Exception as e:
-            logger.error(f"Error inicializando servidor web: {e}")
+            logger.error(f"Error inicializando servidor web: {e}\n{traceback.format_exc()}")
     
     def _update_init_js(self, port, auth_key):
         """Actualizar archivo init.js"""
@@ -399,7 +462,7 @@ class WebServer(ServerScript):
                 f.write(content)
             logger.info("Archivo init.js actualizado")
         except Exception as e:
-            logger.warning(f"No se pudo actualizar init.js: {e}")
+            logger.warning(f"No se pudo actualizar init.js: {e}\n{traceback.format_exc()}")
     
     def _open_browser(self, host, port):
         """Abrir navegador"""
@@ -408,7 +471,7 @@ class WebServer(ServerScript):
             logger.info(f"Abriendo navegador en {url}")
             webbrowser.open(url)
         except Exception as e:
-            logger.warning(f"No se pudo abrir navegador: {e}")
+            logger.warning(f"No se pudo abrir navegador: {e}\n{traceback.format_exc()}")
     
     def on_unload(self):
         """Se ejecuta cuando se descarga el script"""
@@ -417,7 +480,7 @@ class WebServer(ServerScript):
                 self.http_server.shutdown()
                 logger.info("Servidor web detenido")
         except Exception as e:
-            logger.error(f"Error deteniendo servidor web: {e}")
+            logger.error(f"Error deteniendo servidor web: {e}\n{traceback.format_exc()}")
 
 
 def get_class():
