@@ -183,7 +183,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(response.encode('utf-8'))
     
     def handle_bans_api(self):
-        """Devolver lista de IPs baneadas"""
+        """Devolver lista de IPs baneadas con nombre y razón"""
         server = self.server.web_server.server
         
         try:
@@ -196,11 +196,21 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
             
             if ban_script and hasattr(ban_script, 'banned_ips'):
                 bans_list = []
-                for ip, reason in ban_script.banned_ips.items():
-                    bans_list.append({
-                        'ip': ip,
-                        'reason': reason
-                    })
+                for ip, ban_data in ban_script.banned_ips.items():
+                    # Compatibilidad con formato nuevo y antiguo
+                    if isinstance(ban_data, dict):
+                        bans_list.append({
+                            'ip': ip,
+                            'name': ban_data.get('name', 'Desconocido'),
+                            'reason': ban_data.get('reason', 'Sin razón')
+                        })
+                    else:
+                        # Formato antiguo (solo razón como string)
+                        bans_list.append({
+                            'ip': ip,
+                            'name': 'Desconocido',
+                            'reason': ban_data or 'Sin razón'
+                        })
                 
                 response_data = {
                     'response': 'ban_list',
@@ -381,9 +391,9 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     break
                             
                             if ban_script:
-                                # Banear la IP usando el script de ban
+                                # Banear la IP usando el script de ban (ahora pasando nombre)
                                 logger.info(f"[BAN] Baneando IP {player_ip}")
-                                ban_script.ban_ip(player_ip, reason)
+                                ban_script.ban_ip(player_ip, reason, player_name)
                                 response_msg["success"] = True
                                 logger.info(f"[BAN] IP {player_ip} del jugador {player_name} baneada. Razón: {reason}")
                                 server.send_chat(f"IP {player_ip} ha sido baneada")
@@ -400,6 +410,39 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                 else:
                     response_msg["error"] = "ID de jugador no proporcionado"
                     logger.warning("[BAN] ID de jugador no proporcionado")
+
+            elif request == 'unban_ip':
+                ip = data.get('ip')
+                logger.info(f"[UNBAN REQUEST] IP: {ip}")
+                
+                if ip:
+                    try:
+                        # Acceder al script de ban
+                        ban_script = None
+                        for item in server.scripts.items.values():
+                            if hasattr(item, 'unban_ip'):
+                                ban_script = item
+                                logger.info(f"[UNBAN] Script de ban encontrado")
+                                break
+                        
+                        if ban_script:
+                            if ban_script.unban_ip(ip):
+                                response_msg["success"] = True
+                                logger.info(f"[UNBAN] IP {ip} desbaneada correctamente")
+                                server.send_chat(f"IP {ip} ha sido desbaneada")
+                            else:
+                                response_msg["error"] = f"IP {ip} no encontrada en lista de baneados"
+                                logger.warning(f"[UNBAN] IP {ip} no encontrada")
+                        else:
+                            response_msg["error"] = "Script de ban no encontrado"
+                            logger.error("[UNBAN] Script de ban no encontrado")
+                            
+                    except Exception as e:
+                        response_msg["error"] = str(e)
+                        logger.error(f"Error desbaneando IP: {e}\n{traceback.format_exc()}")
+                else:
+                    response_msg["error"] = "IP no proporcionada"
+                    logger.warning("[UNBAN] IP no proporcionada")
                     
             elif request == 'clear_log':
                 logger.info("[LOG] Log limpiado por admin")
