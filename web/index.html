@@ -215,9 +215,29 @@
             <div class="modal-footer">
                 <button class="btn-cancel" data-dismiss="banModal">Cancelar</button>
                 <button class="btn-confirm" id="banConfirmBtn">Banear</button>
+
             </div>
         </div>
     </div>
+
+        <!-- Modal de Desbaneo -->
+    <div id="unbanModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirmar Desbaneo</h3>
+                <button class="modal-close" data-dismiss="unbanModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="unbanPlayerInfo"></p>
+                <p style="margin-top: 15px; color: var(--text-secondary);">¿Estás seguro de que deseas desbanear este jugador?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" data-dismiss="unbanModal">Cancelar</button>
+                <button class="btn-confirm" id="unbanConfirmBtn">Desbanear</button>
+            </div>
+        </div>
+    </div>
+
     
     <script src="js/init.js"></script>
     <script src="js/interface.js"></script>
