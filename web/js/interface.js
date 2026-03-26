@@ -291,9 +291,65 @@ $(document).ready(function () {
         $('.btn-unban').off('click').on('click', function(e) {
             e.preventDefault();
             const banIp = $(this).data('ban-ip');
+            const banItem = $(this).closest('.ban-item');
             
             if (confirm(`¿Estás seguro de que deseas desbanear la IP ${banIp}?`)) {
-                unbanIp(banIp);
+                unbanIp(banIp, banItem);
+            }
+        });
+    }
+
+    function unbanIp(ip, banItem) {
+        $.ajax({
+            url: '/api/command',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                request: 'unban_ip',
+                ip: ip,
+                key: auth_key
+            }),
+            success: function(response) {
+                if (response.success) {
+                    addConsoleMessage('success', `IP ${ip} desbaneada correctamente`);
+                    
+                    // Remover el item con animación
+                    banItem.fadeOut(300, function() {
+                        $(this).remove();
+                        
+                        // Actualizar contador
+                        const newCount = $('#bansContainer .ban-item').length;
+                        $('#banCount').text(newCount);
+                        
+                        // Mostrar mensaje vacío si no hay bans
+                        if (newCount === 0) {
+                            $('#bansContainer').html(`
+                                <div class="empty-state">
+                                    <i class="fas fa-check-circle"></i>
+                                    <p>No hay jugadores baneados</p>
+                                </div>
+                            `);
+                        }
+                        
+                        // Actualizar lista después de 1 segundo
+                        setTimeout(updateBans, 1000);
+                    });
+                } else {
+                    addConsoleMessage('error', `Error al desbanear ${ip}: ${response.error || 'Error desconocido'}`);
+                    // Intentar actualizar de todas formas
+                    setTimeout(updateBans, 1500);
+                }
+            },
+            error: function(xhr) {
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    addConsoleMessage('error', `Error al desbanear (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
+                } catch(e) {
+                    addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
+                }
+                // Actualizar lista después de error
+                setTimeout(updateBans, 1500);
+                console.error('Error details:', xhr);
             }
         });
     }
@@ -589,6 +645,7 @@ $(document).ready(function () {
     updateInterval = setInterval(() => {
         updatePlayers();
         updateServerInfo();
+        updateBans();
     }, 5000);
     
     $(window).on('unload', function() {
