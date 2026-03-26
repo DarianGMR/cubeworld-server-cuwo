@@ -790,6 +790,101 @@ html, body {
     background: var(--primary);
 }
 
+/* ============= BANS LIST ============= */
+.bans-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.ban-item {
+    background: linear-gradient(135deg, var(--dark-card) 0%, rgba(30, 41, 59, 0.5) 100%);
+    border: 1px solid var(--dark-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s ease;
+    animation: slideUp 0.5s ease;
+    border-left: 4px solid var(--danger);
+}
+
+.ban-item:hover {
+    border-color: var(--danger);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    transform: translateX(5px);
+}
+
+.ban-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    flex-shrink: 0;
+    color: white;
+}
+
+.ban-info {
+    flex: 1;
+}
+
+.ban-name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--danger);
+}
+
+.ban-details-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.ban-detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.ban-detail-label {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.ban-detail-value {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.ban-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-unban {
+    background: var(--danger);
+}
+
+.btn-unban:hover {
+    opacity: 0.8;
+    transform: scale(1.05);
+    background: #dc2626;
+}
+
 /* ============= RESPONSIVE ============= */
 @media (max-width: 1200px) {
     .sidebar {
