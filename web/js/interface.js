@@ -15,6 +15,7 @@ $(document).ready(function () {
     ];
     
     let playersData = {};
+    let bansData = {};
     let updateInterval = null;
     let selectedPlayerId = null;
     let previousPlayerIds = new Set();
@@ -29,6 +30,11 @@ $(document).ready(function () {
         
         $(this).addClass('active');
         $('#' + tabName).addClass('active');
+        
+        // Actualizar bans cuando se cambia a la pestaña
+        if (tabName === 'bans') {
+            updateBans();
+        }
     });
     
     // ============= MODAL MANAGEMENT =============
@@ -61,7 +67,7 @@ $(document).ready(function () {
         return hours + 'h ' + mins + 'min';
     }
     
-    // ============= PLAYERS UPDATE - FIXED VERSION =============
+    // ============= PLAYERS UPDATE =============
     function updatePlayers() {
         $.ajax({
             url: '/api/players',
@@ -116,7 +122,9 @@ $(document).ready(function () {
                                 const $value = $(this).find('.player-detail-value');
                                 const labelText = $label.text().toLowerCase();
                                 
-                                if (labelText.includes('salud')) {
+                                if (labelText.includes('ip')) {
+                                    $value.text(player.ip);
+                                } else if (labelText.includes('salud')) {
                                     $value.text(player.hp + ' HP');
                                 } else if (labelText.includes('especialización')) {
                                     $value.text(spec);
@@ -133,8 +141,12 @@ $(document).ready(function () {
                                 <div class="player-item" data-player-id="${player.id}">
                                     <div class="player-avatar">${firstLetter}</div>
                                     <div class="player-info">
-                                        <div class="player-name">${player.name} (ID: ${player.id})</div>
+                                        <div class="player-name">${player.name}</div>
                                         <div class="player-details-row">
+                                            <div class="player-detail-item">
+                                                <span class="player-detail-label">IP</span>
+                                                <span class="player-detail-value">${player.ip}</span>
+                                            </div>
                                             <div class="player-detail-item">
                                                 <span class="player-detail-label">Clase</span>
                                                 <span class="player-detail-value">${className}</span>
@@ -186,6 +198,69 @@ $(document).ready(function () {
             }
         });
     }
+
+    // ============= BANS UPDATE =============
+    function updateBans() {
+        $.ajax({
+            url: '/api/bans',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (!data || !Array.isArray(data.bans)) {
+                    return;
+                }
+                
+                if (data.bans.length === 0) {
+                    $('#bansContainer').html(`
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle"></i>
+                            <p>No hay jugadores baneados</p>
+                        </div>
+                    `);
+                } else {
+                    $('#bansContainer').html('');
+                    
+                    data.bans.forEach(ban => {
+                        const banItem = `
+                            <div class="ban-item" data-ban-ip="${ban.ip}">
+                                <div class="ban-avatar">
+                                    <i class="fas fa-ban"></i>
+                                </div>
+                                <div class="ban-info">
+                                    <div class="ban-name">${ban.name || 'Desconocido'}</div>
+                                    <div class="ban-details-row">
+                                        <div class="ban-detail-item">
+                                            <span class="ban-detail-label">IP Baneada</span>
+                                            <span class="ban-detail-value">${ban.ip}</span>
+                                        </div>
+                                        <div class="ban-detail-item">
+                                            <span class="ban-detail-label">Razón</span>
+                                            <span class="ban-detail-value">${ban.reason || 'Sin razón'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ban-actions">
+                                    <button class="btn-action btn-unban" data-ban-ip="${ban.ip}" data-action="unban">
+                                        <i class="fas fa-lock-open"></i> Desbanear
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        $('#bansContainer').append(banItem);
+                    });
+                    
+                    attachBanActionHandlers();
+                }
+                
+                $('#banCount').text(data.count || 0);
+                
+            },
+            error: function(xhr) {
+                addConsoleMessage('error', `Error al obtener lista de baneados: ${xhr.status} ${xhr.statusText}`);
+            }
+        });
+    }
     
     function attachPlayerActionHandlers() {
         $('.btn-action').off('click').on('click', function(e) {
@@ -200,14 +275,25 @@ $(document).ready(function () {
                 healPlayer(playerId, player.name);
             } else if (action === 'kick') {
                 selectedPlayerId = playerId;
-                $('#kickPlayerName').text('Jugador: ' + player.name);
+                $('#kickPlayerName').text('Jugador: ' + player.name + ' (' + player.ip + ')');
                 $('#kickReason').val('');
                 showModal('kickModal');
             } else if (action === 'ban') {
                 selectedPlayerId = playerId;
-                $('#banPlayerName').text('Jugador: ' + player.name);
+                $('#banPlayerName').text('Jugador: ' + player.name + ' (' + player.ip + ')');
                 $('#banReason').val('');
                 showModal('banModal');
+            }
+        });
+    }
+
+    function attachBanActionHandlers() {
+        $('.btn-unban').off('click').on('click', function(e) {
+            e.preventDefault();
+            const banIp = $(this).data('ban-ip');
+            
+            if (confirm(`¿Estás seguro de que deseas desbanear la IP ${banIp}?`)) {
+                unbanIp(banIp);
             }
         });
     }
@@ -236,6 +322,39 @@ $(document).ready(function () {
                     addConsoleMessage('error', `Error al sanar (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
                 } catch(e) {
                     addConsoleMessage('error', `Error de conexión al sanar: HTTP ${xhr.status}`);
+                }
+                console.error('Error details:', xhr);
+            }
+        });
+    }
+
+    function unbanIp(ip) {
+        $.ajax({
+            url: '/api/command',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                request: 'unban_ip',
+                ip: ip,
+                key: auth_key
+            }),
+            success: function(response) {
+                if (response.success) {
+                    addConsoleMessage('success', `IP ${ip} desbaneada correctamente`);
+                    $(`#bansContainer .ban-item[data-ban-ip="${ip}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                        updateBans();
+                    });
+                } else {
+                    addConsoleMessage('error', `Error al desbanear ${ip}: ${response.error || 'Error desconocido'}`);
+                }
+            },
+            error: function(xhr) {
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    addConsoleMessage('error', `Error al desbanear (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
+                } catch(e) {
+                    addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
                 }
                 console.error('Error details:', xhr);
             }
@@ -284,11 +403,7 @@ $(document).ready(function () {
     });
     
     $('#banConfirmBtn').on('click', function() {
-        const reason = $('#banReason').val().trim();
-        if (!reason) {
-            alert('Por favor, proporciona una razón');
-            return;
-        }
+        const reason = $('#banReason').val().trim() || 'Sin razón especificada';
         
         const player = playersData[selectedPlayerId];
         if (!player) return;
@@ -305,12 +420,13 @@ $(document).ready(function () {
             }),
             success: function(response) {
                 if (response.success) {
-                    addConsoleMessage('success', `Jugador ${player.name} baneado correctamente. Razón: ${reason}`);
+                    addConsoleMessage('success', `Jugador ${player.name} baneado correctamente. IP: ${player.ip} Razón: ${reason}`);
                 } else {
                     addConsoleMessage('warning', `${player.name} expulsado (no se pudo banear): ${response.error || 'Error desconocido'}`);
                 }
                 hideModal('banModal');
                 updatePlayers();
+                updateBans();
             },
             error: function(xhr) {
                 try {
@@ -468,6 +584,7 @@ $(document).ready(function () {
     // ============= INITIALIZATION =============
     updatePlayers();
     updateServerInfo();
+    updateBans();
     
     updateInterval = setInterval(() => {
         updatePlayers();
