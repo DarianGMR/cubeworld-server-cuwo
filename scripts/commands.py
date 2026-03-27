@@ -54,13 +54,67 @@ def login(script, password):
 def help(script, name=None):
     """Devuelve informacion sobre los comandos."""
     if name is None:
-        commands = sorted([item.name for item in script.get_commands()])
-        return 'Comandos: ' + ', '.join(commands)
+        # Diccionario con información de todos los comandos
+        commands_help = {
+            'help': ('help [nombre_comando]', 'Muestra información sobre los comandos'),
+            'say': ('say (mensaje)', 'Envía un mensaje global al servidor'),
+            'server': ('server', 'Muestra información sobre la plataforma del servidor'),
+            'login': ('login (contraseña)', 'Inicia sesión con permisos especiales'),
+            'kick': ('kick (nombre) [razón]', 'Expulsa a un jugador del servidor'),
+            'setclock': ('setclock (hh:mm)', 'Establece la hora del día'),
+            'whereis': ('whereis [nombre]', 'Muestra la ubicación de un jugador'),
+            'pm': ('pm (nombre) (mensaje)', 'Envía un mensaje privado a un jugador'),
+            'kill': ('kill [nombre]', 'Mata a un jugador'),
+            'stun': ('stun (nombre) [segundos]', 'Aturde a un jugador por un tiempo'),
+            'heal': ('heal [nombre] [hp]', 'Cura a un jugador'),
+            'who': ('who', 'Lista todos los jugadores conectados'),
+            'whowhere': ('whowhere', 'Lista jugadores y sus ubicaciones'),
+            'player': ('player (nombre)', 'Muestra información detallada de un jugador'),
+            'addrights': ('addrights (nombre) (derecho)', 'Otorga derechos especiales a un usuario'),
+            'removerights': ('removerights (nombre) (derecho)', 'Elimina derechos especiales de un usuario'),
+            'rights': ('rights [nombre]', 'Muestra los derechos de un usuario'),
+            'sound': ('sound (nombre)', 'Reproduce un sonido global'),
+            'teleport': ('teleport (jugador) | (x) (y) | (x) (y) (z)', 'Teletransportate a un jugador o ubicación'),
+            't': ('t (jugador) | (x) (y) | (x) (y) (z)', 'Alias de teleport'),
+            'load': ('load (nombre_script)', 'Carga un script en tiempo de ejecución'),
+            'unload': ('unload (nombre_script)', 'Descarga un script en tiempo de ejecución'),
+            'reload': ('reload (nombre_script)', 'Recarga un script en tiempo de ejecución'),
+            'scripts': ('scripts', 'Muestra los scripts cargados actualmente'),
+            'ban': ('ban (nombre) [razón]', 'Banea a un jugador por su IP'),
+            'unban': ('unban (IP)', 'Desbanea una IP'),
+            'banlist': ('banlist', 'Muestra todas las IPs baneadas'),
+        }
+        
+        lines = []
+        lines.append("=" * 90)
+        lines.append("COMANDOS DISPONIBLES:")
+        lines.append("=" * 90)
+        
+        # Obtener comandos válidos del script
+        valid_commands = {cmd.name for cmd in script.get_commands()}
+        
+        # Calcular ancho máximo para alineación
+        max_width = max(len(usage) for usage, _ in commands_help.values() if usage)
+        
+        for cmd_name in sorted(commands_help.keys()):
+            if cmd_name in valid_commands or cmd_name == 't':  # Incluir alias
+                usage, description = commands_help[cmd_name]
+                line = f"  {usage.ljust(max_width)} → {description}"
+                lines.append(line)
+        
+        lines.append("=" * 90)
+        lines.append("Nota: (parámetro) = obligatorio | [parámetro] = opcional")
+        lines.append("=" * 90)
+        
+        return '\n'.join(lines)
     else:
+        # Mostrar información detallada de un comando específico
         command = script.get_command(name)
         if command is None:
-            return 'No existe tal comando'
-        return command.get_help()
+            return f'No existe tal comando: {name}'
+        
+        help_text = command.get_help()
+        return help_text if help_text else f"Sin información disponible para el comando: {name}"
 
 
 @command
@@ -118,27 +172,33 @@ def kill(script, name=None):
 
 @command
 @admin
-def stun(script, name, milliseconds=1000):
-    """Aturde a un jugador por un tiempo especifico."""
+def stun(script, name, seconds=1):
+    """Aturde a un jugador por un tiempo especifico en segundos."""
     
-    # Limita el tiempo de aturdimiento, ya que valores demasiado altos pueden provocar que el servidor falle.
-    # Ademas, prohibe los valores negativos por si acaso.
+    # Convertir segundos a milisegundos
     try:
-        milliseconds = int(milliseconds)  # Convertir a int para evitar error con str
+        seconds = int(seconds)
     except ValueError:
-        return f"Error: El tiempo debe ser un número, recibido: {milliseconds}"
+        return f"Error: El tiempo debe ser un número en segundos, recibido: {seconds}"
     
+    # Convertir a milisegundos
+    milliseconds = seconds * 1000
+    
+    # Limita el tiempo de aturdimiento
     milliseconds = abs(milliseconds)
     if milliseconds > MAX_STUN_TIME:
-        err = 'El tiempo de aturdimiento es demasiado largo. Por favor, especifique un valor inferior a %d..'
-        return err % MAX_STUN_TIME
+        err = 'El tiempo de aturdimiento es demasiado largo. Por favor, especifique un valor inferior a %d segundos' % (MAX_STUN_TIME // 1000)
+        return err
     
-    player = script.get_player(name)
-    player.entity.damage(stun_duration=int(milliseconds))
-    message = '%s fue aturdido' % player.name
-    print(message)
-    script.server.send_chat(message)
-    return message
+    try:
+        player = script.get_player(name)
+        player.entity.damage(stun_duration=int(milliseconds))
+        message = '%s fue aturdido durante %d segundos' % (player.name, seconds)
+        print(message)
+        script.server.send_chat(message)
+        return message
+    except Exception as e:
+        return f"Jugador inválido especificado"
 
 
 @command
