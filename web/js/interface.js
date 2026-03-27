@@ -609,13 +609,16 @@ $(document).ready(function () {
     
     function addConsoleMessage(type, text) {
         let span = '<span class="console-success">✓</span>';
+        let lineClass = '';
+        
         if (type === 'error') {
             span = '<span class="console-error">✗</span>';
+            lineClass = 'console-line-error';
         } else if (type === 'warning') {
             span = '<span class="console-warning">⚠</span>';
         }
         
-        const line = `<div class="console-line">${span} ${escapeHtml(text)}</div>`;
+        const line = `<div class="console-line ${lineClass}">${span} ${escapeHtml(text)}</div>`;
         $('#consoleOutput').append(line);
         $('#consoleOutput').scrollTop($('#consoleOutput')[0].scrollHeight);
     }
@@ -667,20 +670,23 @@ $(document).ready(function () {
     });
     
     $('#clearLogBtn').on('click', function() {
-        if (confirm('¿Estás seguro de que deseas limpiar el log completamente?')) {
-            $.ajax({
-                url: '/api/command',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    request: 'clear_log',
-                    key: auth_key
-                }),
-                success: function() {
-                    $('#consoleOutput').html('<div class="console-line"><span class="console-success">✓</span> Log limpiado completamente</div>');
-                }
-            });
-        }
+        showModal('clearLogModal');
+    });
+    
+    $('#clearLogConfirmBtn').on('click', function() {
+        $.ajax({
+            url: '/api/command',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                request: 'clear_log',
+                key: auth_key
+            }),
+            success: function() {
+                hideModal('clearLogModal');
+                $('#consoleOutput').html('<div class="console-line"><span class="console-success">✓</span> Log limpiado</div>');
+            }
+        });
     });
     
     // ============= CHAT =============
