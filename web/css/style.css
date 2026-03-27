@@ -512,6 +512,24 @@ html, body {
     color: #ff8787;
 }
 
+.console-line .console-pre {
+    display: block;
+    margin: 5px 0 5px 0;
+    padding: 5px 10px;
+    margin-left: 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #ffffff;
+    white-space: pre;
+    word-wrap: break-word;
+    overflow-x: auto;
+}
+
+.console-line-error-command .console-pre {
+    color: #ffffff;
+}
+
 .console-success {
     color: var(--success);
     margin-right: 8px;
