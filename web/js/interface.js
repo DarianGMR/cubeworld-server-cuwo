@@ -554,7 +554,22 @@ $(document).ready(function () {
                 if (totalLogs > currentLogLines) {
                     const newLogs = data.logs.slice(currentLogLines);
                     newLogs.forEach(logLine => {
-                        const line = `<div class="console-line"><span class="console-success">✓</span> ${escapeHtml(logLine)}</div>`;
+                        // Detectar símbolo inicial
+                        let isError = false;
+                        let displayLine = logLine;
+                        
+                        if (logLine.startsWith('✗')) {
+                            isError = true;
+                            displayLine = logLine.substring(1).trim();
+                        } else if (logLine.startsWith('✓')) {
+                            displayLine = logLine.substring(1).trim();
+                        }
+                        
+                        // Aplicar estilos según el símbolo
+                        let symbolClass = isError ? 'console-error' : 'console-success';
+                        let lineClass = isError ? 'console-line-error-command' : '';
+                        
+                        const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span> ${escapeHtml(displayLine)}</div>`;
                         $('#consoleOutput').append(line);
                     });
                     $('#consoleOutput').scrollTop($('#consoleOutput')[0].scrollHeight);
@@ -583,7 +598,22 @@ $(document).ready(function () {
                     if (existingLogs <= 1) {
                         // Solo hay "Servidor web conectado", reemplazar con logs reales
                         data.logs.forEach(logLine => {
-                            const line = `<div class="console-line"><span class="console-success">✓</span> ${escapeHtml(logLine)}</div>`;
+                            // Detectar símbolo inicial
+                            let isError = false;
+                            let displayLine = logLine;
+                            
+                            if (logLine.startsWith('✗')) {
+                                isError = true;
+                                displayLine = logLine.substring(1).trim();
+                            } else if (logLine.startsWith('✓')) {
+                                displayLine = logLine.substring(1).trim();
+                            }
+                            
+                            // Aplicar estilos según el símbolo
+                            let symbolClass = isError ? 'console-error' : 'console-success';
+                            let lineClass = isError ? 'console-line-error-command' : '';
+                            
+                            const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span> ${escapeHtml(displayLine)}</div>`;
                             $('#consoleOutput').append(line);
                         });
                         $('#consoleOutput').scrollTop($('#consoleOutput')[0].scrollHeight);
@@ -613,7 +643,7 @@ $(document).ready(function () {
         
         if (type === 'error') {
             span = '<span class="console-error">✗</span>';
-            lineClass = 'console-line-error';
+            lineClass = 'console-line-error-command';
         } else if (type === 'warning') {
             span = '<span class="console-warning">⚠</span>';
         }
@@ -627,7 +657,7 @@ $(document).ready(function () {
         if (e.which === 13) {
             const command = $(this).val().trim();
             if (command) {
-                addConsoleMessage('info', '> ' + command);
+                // NO agregar el comando todavía, esperar respuesta
                 
                 $.ajax({
                     url: '/api/command',
@@ -639,11 +669,15 @@ $(document).ready(function () {
                         key: auth_key
                     }),
                     success: function(response) {
+                        // Ahora mostrar el comando con el símbolo correcto
                         if (response.success) {
+                            addConsoleMessage('success', '> ' + command);
                             if (response.output && response.output.trim()) {
                                 addConsoleMessage('success', response.output);
                             }
                         } else {
+                            // Error en comando - mostrar con símbolo de error
+                            addConsoleMessage('error', '> ' + command);
                             if (response.error) {
                                 addConsoleMessage('error', response.error);
                             } else {
@@ -656,8 +690,10 @@ $(document).ready(function () {
                     error: function(xhr) {
                         try {
                             const errorData = JSON.parse(xhr.responseText);
+                            addConsoleMessage('error', '> ' + command);
                             addConsoleMessage('error', `Error: ${errorData.error || 'Error desconocido'}`);
                         } catch(e) {
+                            addConsoleMessage('error', '> ' + command);
                             addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
                         }
                     }
