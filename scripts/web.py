@@ -620,11 +620,15 @@ class WebServer(ServerScript):
         self.current_session_logs = []
 
     def clear_all_logs(self):
-        """Limpiar archivo de logs completamente"""
+        """Limpiar archivo de logs completamente y regenerar marcador de sesión"""
         try:
             # Vaciar archivo completamente
             with open(LOG_FILE, 'w', encoding='utf-8') as f:
                 f.write('')
+            
+            # Regenerar marcador de sesión actual
+            self._write_session_marker()
+            
             # Limpiar sesión actual también
             self.current_session_logs = []
         except Exception as e:
