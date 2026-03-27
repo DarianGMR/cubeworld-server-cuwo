@@ -14,6 +14,7 @@ import logging
 import sys
 import traceback
 import io
+from io import StringIO
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from cuwo.script import ServerScript, ConnectionScript, ScriptInterface
