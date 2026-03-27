@@ -26,6 +26,7 @@ def say(script, *message):
     """Envia un mensaje global al servidor."""
     message = ' '.join(message)
     script.server.send_chat(message)
+    return f"Mensaje enviado: {message}"
 
 
 @command
@@ -69,6 +70,7 @@ def kick(script, name, *reason):
     reason = ' '.join(reason) or 'No se especifica ningun motivo'
     player = script.get_player(name)
     player.kick(reason)
+    return f"Jugador {player.name} expulsado. Razón: {reason}"
 
 
 @command
@@ -111,25 +113,32 @@ def kill(script, name=None):
     message = '%s fue asesinado' % player.name
     print(message)
     script.server.send_chat(message)
+    return message
 
 
 @command
 @admin
 def stun(script, name, milliseconds=1000):
     """Aturde a un jugador por un tiempo especifico."""
-
+    
     # Limita el tiempo de aturdimiento, ya que valores demasiado altos pueden provocar que el servidor falle.
     # Ademas, prohibe los valores negativos por si acaso.
+    try:
+        milliseconds = int(milliseconds)  # Convertir a int para evitar error con str
+    except ValueError:
+        return f"Error: El tiempo debe ser un número, recibido: {milliseconds}"
+    
     milliseconds = abs(milliseconds)
     if milliseconds > MAX_STUN_TIME:
         err = 'El tiempo de aturdimiento es demasiado largo. Por favor, especifique un valor inferior a %d..'
         return err % MAX_STUN_TIME
-
+    
     player = script.get_player(name)
     player.entity.damage(stun_duration=int(milliseconds))
     message = '%s fue aturdido' % player.name
     print(message)
     script.server.send_chat(message)
+    return message
 
 
 @command
@@ -229,6 +238,7 @@ def sound(script, name):
     """Reproduce un sonido global."""
     try:
         script.server.play_sound(name)
+        return f"Sonido '{name}' reproducido"
     except KeyError:
         return 'No hay tal sonido'
 
