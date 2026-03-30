@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Web Interface Script for cuwo
-Sirve la interfaz web con soporte para administración
+Sirve la interfaz web con soporte para administracion
 """
 
 import os
@@ -24,7 +24,11 @@ SITE_PATH = 'web'
 PLAYTIME_DATA_NAME = 'web_playtimes'
 MAX_LOG_LINES = 500
 LOG_FILE = 'logs/console.log'
+CHAT_LOG_FILE = 'logs/chat.log'
 SESSION_MARKER = "=" * 80
+
+# Variable global para acceder a la instancia del WebServer
+_web_server_instance = None
 
 # Crear carpeta de logs si no existe
 os.makedirs('logs', exist_ok=True)
@@ -34,7 +38,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(message)s',
     handlers=[
-        logging.FileHandler('logs/web.log'),
+        logging.FileHandler('logs/web.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -66,12 +70,10 @@ class ErrorCapture(logging.Handler):
     def emit(self, record):
         try:
             if record.exc_info:
-                # Hay excepción, capturar traceback completo
                 exc_type, exc_value, exc_traceback = record.exc_info
                 full_traceback = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
                 self.web_server.add_error_line(full_traceback)
             else:
-                # Solo mensaje de error
                 msg = self.format(record)
                 self.web_server.add_error_line(msg)
         except Exception:
@@ -79,7 +81,7 @@ class ErrorCapture(logging.Handler):
 
 
 class WebConnectionScript(ConnectionScript):
-    """Script para trackear tiempo de conexión de jugadores"""
+    """Script para trackear tiempo de conexion de jugadores"""
     
     def on_join(self, event):
         """Se ejecuta cuando un jugador entra al servidor"""
@@ -92,10 +94,8 @@ class WebConnectionScript(ConnectionScript):
                 playtime_data = self.server.load_data(PLAYTIME_DATA_NAME, {})
                 player_name = self.connection.name.lower()
                 
-                # Calcular tiempo de juego en segundos
                 playtime_seconds = int(time.time() - self.connection.web_join_time)
                 
-                # Si el jugador ya tenía tiempo registrado, sumarle
                 if player_name in playtime_data:
                     playtime_data[player_name] += playtime_seconds
                 else:
@@ -183,7 +183,6 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         players_list = []
         current_time = time.time()
         
-        # Cargar datos de playtime persistentes
         playtime_data = server.load_data(PLAYTIME_DATA_NAME, {})
         
         try:
@@ -196,11 +195,8 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         continue
                     
                     entity = connection.entity
-                    
-                    # Usar ID simple basado en la conexión
                     player_id = id(connection) % 10000
                     
-                    # Calcular tiempo de juego en minutos
                     playtime_minutes = 0
                     if hasattr(connection, 'web_join_time'):
                         session_playtime = int((current_time - connection.web_join_time) / 60)
@@ -244,7 +240,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(response.encode('utf-8'))
     
     def handle_bans_api(self):
-        """Devolver lista de IPs baneadas con nombre y razón"""
+        """Devolver lista de IPs baneadas con nombre y razon"""
         server = self.server.web_server.server
         
         try:
@@ -261,13 +257,13 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         bans_list.append({
                             'ip': ip,
                             'name': ban_data.get('name', 'Desconocido'),
-                            'reason': ban_data.get('reason', 'Sin razón')
+                            'reason': ban_data.get('reason', 'Sin razon')
                         })
                     else:
                         bans_list.append({
                             'ip': ip,
                             'name': 'Desconocido',
-                            'reason': ban_data or 'Sin razón'
+                            'reason': ban_data or 'Sin razon'
                         })
                 
                 response_data = {
@@ -296,7 +292,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(response.encode('utf-8'))
     
     def handle_server_api(self):
-        """Devolver información del servidor"""
+        """Devolver informacion del servidor"""
         server = self.server.web_server.server
         
         try:
@@ -326,13 +322,24 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(response.encode('utf-8'))
     
     def handle_chat_api(self):
-        """Devolver historial de chat"""
-        chat_history = getattr(self.server.web_server, 'chat_history', [])
-        response = json.dumps({'response': 'chat_history', 'messages': chat_history})
+        """Devolver historial completo de chat desde archivo de la sesion actual"""
+        global _web_server_instance
+        
+        chat_history = []
+        if _web_server_instance is not None:
+            chat_history = _web_server_instance.load_chat_history()
+        
+        response_data = {
+            'response': 'chat_history',
+            'messages': chat_history,
+            'count': len(chat_history)
+        }
+        
+        response = json.dumps(response_data, ensure_ascii=False)
         
         self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', len(response))
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', len(response.encode('utf-8')))
         self.end_headers()
         self.wfile.write(response.encode('utf-8'))
     
@@ -365,10 +372,9 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                 if message:
                     formatted_msg = f"cuwo: {message}"
                     server.send_chat(formatted_msg)
-                    chat_history = getattr(self.server.web_server, 'chat_history', [])
-                    chat_history.append({'id': 0, 'name': 'Server', 'message': formatted_msg})
-                    if len(chat_history) > 100:
-                        chat_history.pop(0)
+                    global _web_server_instance
+                    if _web_server_instance is not None:
+                        _web_server_instance.add_chat_message('Server', formatted_msg)
                     response_msg["success"] = True
                     
             elif request == 'execute_command':
@@ -379,47 +385,39 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     cmd_args = parts[1:] if len(parts) > 1 else []
                     
                     try:
-                        # Validar que el comando existe
                         script_interface = ScriptInterface('Web', server, 'admin', 'web')
                         cmd_obj = script_interface.get_command(cmd_name)
                         
                         if cmd_obj is None:
-                            error_msg = f"Comando inválido: '{cmd_name}' no existe"
+                            error_msg = f"Comando invalido: '{cmd_name}' no existe"
                             response_msg["success"] = False
                             response_msg["error"] = error_msg
                             self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
                             self.server.web_server.add_log_line_with_symbol(error_msg, "error")
                         else:
-                            # Capturar stdout/stderr para obtener TODOS los outputs
                             output_buffer = io.StringIO()
                             error_buffer = io.StringIO()
                             
                             try:
-                                # Ejecutar comando con captura de output
                                 with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
                                     result = server.call_command(script_interface, cmd_name, cmd_args)
                                 
-                                # Obtener outputs capturados
                                 captured_output = output_buffer.getvalue().strip()
                                 captured_error = error_buffer.getvalue().strip()
                                 
-                                # Procesar resultado
                                 if captured_error:
-                                    # Hubo error en stderr
                                     response_msg["success"] = False
                                     response_msg["error"] = captured_error
                                     self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
                                     self.server.web_server.add_log_line_with_symbol(captured_error, "error")
                                 elif result is not None and str(result).strip():
-                                    # Comando retorna algo
                                     result_str = str(result).strip()
                                     
-                                    # Verificar si el resultado es un error basado en palabras clave
                                     error_keywords = [
                                         "Error:",
                                         "error",
                                         "Traceback",
-                                        "Jugador inválido",
+                                        "Jugador invalido",
                                         "No existe",
                                         "no encontrado",
                                         "AttributeError",
@@ -444,20 +442,17 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                         self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
                                         self.server.web_server.add_log_line_with_symbol(result_str, "success")
                                 elif captured_output:
-                                    # Hay output capturado (print statements)
                                     response_msg["success"] = True
                                     response_msg["output"] = captured_output
                                     self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
                                     self.server.web_server.add_log_line_with_symbol(captured_output, "success")
                                 else:
-                                    # Comando ejecutado pero sin output
                                     response_msg["success"] = True
                                     response_msg["output"] = f"Comando '{cmd_name}' ejecutado correctamente"
                                     self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
                                     self.server.web_server.add_log_line_with_symbol(f"Comando '{cmd_name}' ejecutado correctamente", "success")
                                     
                             except Exception as cmd_error:
-                                # Error DURANTE la ejecución del comando - capturar excepción completa
                                 error_type = type(cmd_error).__name__
                                 error_msg = str(cmd_error)
                                 error_trace = traceback.format_exc()
@@ -467,7 +462,6 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                 
                                 self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
                                 
-                                # Agregar traceback completo línea por línea
                                 for line in error_trace.split('\n'):
                                     if line.strip():
                                         self.server.web_server.add_log_line_with_symbol(line, "error")
@@ -481,7 +475,6 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         
                         self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
                         
-                        # Agregar traceback completo línea por línea
                         for line in error_trace.split('\n'):
                             if line.strip():
                                 self.server.web_server.add_log_line_with_symbol(line, "error")
@@ -501,9 +494,9 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     self.server.web_server.add_log_line_with_symbol(f"[HEAL] {msg}", "success")
                                     server.send_chat(msg)
                                 else:
-                                    response_msg["error"] = "Entidad sin método damage()"
+                                    response_msg["error"] = "Entidad sin metodo damage()"
                             else:
-                                response_msg["error"] = "Conexión sin entidad"
+                                response_msg["error"] = "Conexion sin entidad"
                         except Exception as e:
                             response_msg["error"] = str(e)
                     else:
@@ -518,7 +511,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         try:
                             connection.kick(reason)
                             response_msg["success"] = True
-                            self.server.web_server.add_log_line_with_symbol(f"[KICK] Jugador {connection.name} expulsado. Razón: {reason}", "success")
+                            self.server.web_server.add_log_line_with_symbol(f"[KICK] Jugador {connection.name} expulsado. Razon: {reason}", "success")
                         except Exception as e:
                             response_msg["error"] = str(e)
                     else:
@@ -544,7 +537,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                             if ban_script:
                                 ban_script.ban_ip(player_ip, reason, player_name)
                                 response_msg["success"] = True
-                                self.server.web_server.add_log_line_with_symbol(f"[BAN] Jugador {player_name} baneado por IP {player_ip}. Razón: {reason}", "success")
+                                self.server.web_server.add_log_line_with_symbol(f"[BAN] Jugador {player_name} baneado por IP {player_ip}. Razon: {reason}", "success")
                                 server.send_chat(f"IP {player_ip} ha sido baneada")
                             else:
                                 response_msg["error"] = "Script de ban no encontrado"
@@ -606,12 +599,19 @@ class WebServer(ServerScript):
     
     connection_class = WebConnectionScript
     
+    def __init__(self, server):
+        """Inicializar el script y guardar la referencia global"""
+        super().__init__(server)
+        global _web_server_instance
+        _web_server_instance = self
+    
     def on_load(self):
         """Se ejecuta cuando se carga el script"""
         try:
             self.start_time = time.time()
             self.session_start_time = datetime.now()
             self.current_session_logs = []
+            self.session_start_marker = None
             
             config = self.server.config.web
             
@@ -619,7 +619,12 @@ class WebServer(ServerScript):
             web_host = config.host
             auto_open = config.auto_open
             self.auth_key = config.auth_key
-            self.chat_history = []
+            
+            # Escribir marcador de sesion de chat
+            self.session_start_marker = self._write_chat_session_marker()
+            
+            # Parchar el sistema de chat
+            self._patch_chat_system()
             
             if not os.path.exists(SITE_PATH):
                 logger.error(f"Carpeta '{SITE_PATH}' no encontrada")
@@ -631,7 +636,6 @@ class WebServer(ServerScript):
             self.http_server = HTTPServer((web_host, web_port), handler)
             self.http_server.web_server = self
             
-            # Agregar handlers para capturar logs
             web_log_capture = WebLogCapture(self)
             logger.addHandler(web_log_capture)
             
@@ -647,8 +651,9 @@ class WebServer(ServerScript):
             web_thread = threading.Thread(target=run_web_server, daemon=True)
             web_thread.start()
             
-            # Escribir marcador de sesión
             self._write_session_marker()
+            
+            logger.info("[OK] Servidor web iniciado correctamente")
             
             if auto_open:
                 self.loop.call_later(1, lambda: self._open_browser(web_host, web_port))
@@ -656,52 +661,155 @@ class WebServer(ServerScript):
         except Exception as e:
             logger.error(f"Error inicializando servidor web: {e}\n{traceback.format_exc()}")
     
-    def _write_session_marker(self):
-        """Escribir marcador de sesión en archivo"""
+    def _patch_chat_system(self):
+        """Reemplazar print() con una version que guarde en chat.log"""
+        import builtins
+        
+        original_print = builtins.print
+        web_server = self
+        
+        def patched_print(*args, **kwargs):
+            """Print parcheado que captura mensajes de chat"""
+            # Llamar al print original
+            original_print(*args, **kwargs)
+            
+            # Intentar extraer el mensaje de chat si tiene el formato "nombre: mensaje"
+            if args:
+                message_str = str(args[0])
+                
+                # Detectar si es un mensaje de chat con formato "nombre: mensaje"
+                if ':' in message_str and len(message_str) > 3:
+                    parts = message_str.split(':', 1)
+                    if len(parts) == 2:
+                        player_name = parts[0].strip()
+                        chat_message = parts[1].strip()
+                        
+                        # Validar que el nombre solo contiene caracteres validos (no es un log del sistema)
+                        if player_name and all(c.isalnum() or c in ' -_' for c in player_name):
+                            if chat_message and not any(x in player_name for x in ['[', ']', '(', ')']):
+                                try:
+                                    web_server.add_chat_message(player_name, chat_message)
+                                except Exception as e:
+                                    original_print(f"Error guardando chat: {e}")
+        
+        builtins.print = patched_print
+        logger.info("[OK] Sistema de chat parcheado - monitoreando print()")
+    
+    def add_chat_message(self, player_name, message):
+        """Agregar un mensaje al log de chat - SOLO si es de la sesion actual"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            marker = f"\n{SESSION_MARKER}\nSESIÓN INICIADA: {timestamp}\n{SESSION_MARKER}\n"
+            chat_entry = f"[{timestamp}] {player_name}: {message}"
+            
+            # Escribir en archivo chat.log
+            with open(CHAT_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(chat_entry + '\n')
+            
+            logger.debug(f"Mensaje de chat guardado: {player_name}: {message}")
+        except Exception as e:
+            logger.error(f"Error guardando mensaje de chat: {e}\n{traceback.format_exc()}")
+    
+    def load_chat_history(self):
+        """Cargar SOLO los mensajes de la sesion actual desde el archivo"""
+        chat_history = []
+        try:
+            if os.path.exists(CHAT_LOG_FILE):
+                with open(CHAT_LOG_FILE, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                # Encontrar el ultimo marcador de sesion
+                last_session_marker_idx = -1
+                for i in range(len(lines) - 1, -1, -1):
+                    if SESSION_MARKER in lines[i]:
+                        last_session_marker_idx = i
+                        break
+                
+                # Procesar solo desde el ultimo marcador hasta el final
+                start_idx = last_session_marker_idx + 1 if last_session_marker_idx >= 0 else 0
+                
+                for line in lines[start_idx:]:
+                    line = line.strip()
+                    if line and '[' in line and ']' in line and ':' in line:
+                        try:
+                            # Formato: [YYYY-MM-DD HH:MM:SS] nombre: mensaje
+                            timestamp_end = line.find(']')
+                            if timestamp_end > 0:
+                                timestamp = line[1:timestamp_end]
+                                rest = line[timestamp_end+2:]  # Skip '] '
+                                
+                                if ':' in rest:
+                                    name, message = rest.split(':', 1)
+                                    name = name.strip()
+                                    message = message.strip()
+                                    
+                                    if name and message:  # Solo si ambos existen
+                                        chat_history.append({
+                                            'timestamp': timestamp,
+                                            'name': name,
+                                            'message': message
+                                        })
+                        except Exception as parse_error:
+                            pass
+        except Exception as e:
+            logger.error(f"Error cargando historial de chat: {e}")
+        
+        return chat_history
+    
+    def _write_chat_session_marker(self):
+        """Escribir marcador de sesion en chat.log - retorna el timestamp"""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            marker = f"{SESSION_MARKER}\n[{timestamp}] SESION INICIADA\n{SESSION_MARKER}\n"
+            
+            with open(CHAT_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(marker)
+            
+            return timestamp
+        except Exception as e:
+            logger.error(f"Error escribiendo marcador de sesion de chat: {e}")
+            return None
+    
+    def _write_session_marker(self):
+        """Escribir marcador de sesion en archivo"""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            marker = f"\n{SESSION_MARKER}\nSESION INICIADA: {timestamp}\n{SESSION_MARKER}\n"
             
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(marker)
         except Exception as e:
-            logger.error(f"Error escribiendo marcador de sesión: {e}")
+            logger.error(f"Error escribiendo marcador de sesion: {e}")
     
     def add_log_line(self, line):
-        """Agregar línea de log con fecha/hora al archivo"""
+        """Agregar linea de log con fecha/hora al archivo"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             log_entry = f"[{timestamp}] {line}"
             
-            # Agregar a sesión actual (sin timestamp para mostrar en web)
             self.current_session_logs.append(line)
             if len(self.current_session_logs) > MAX_LOG_LINES:
                 self.current_session_logs.pop(0)
             
-            # Escribir en archivo (con timestamp para persistencia)
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(log_entry + '\n')
         except Exception as e:
             logger.error(f"Error escribiendo log: {e}")
     
     def add_log_line_with_symbol(self, line, msg_type="info"):
-        """Agregar línea de log con símbolo en memoria, sin símbolo en archivo"""
+        """Agregar linea de log con simbolo en memoria, sin simbolo en archivo"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # En sesión actual (memoria) - agregar con símbolo para mostrar en web
             if msg_type == "error":
-                symbol = "✗"
+                symbol = "[ERROR]"
             else:
-                symbol = "✓"
+                symbol = "[OK]"
             
-            # Agregar a sesión actual CON símbolo
             formatted_line = f"{symbol} {line}"
             self.current_session_logs.append(formatted_line)
             if len(self.current_session_logs) > MAX_LOG_LINES:
                 self.current_session_logs.pop(0)
             
-            # Escribir en archivo CON símbolo (igual a lo que se muestra)
             log_entry = f"[{timestamp}] {symbol} {line}"
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(log_entry + '\n')
@@ -709,21 +817,18 @@ class WebServer(ServerScript):
             logger.error(f"Error escribiendo log: {e}")
     
     def add_error_line(self, error_text):
-        """Agregar línea de error con traceback completo"""
+        """Agregar linea de error con traceback completo"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Agregar a sesión actual con símbolo de error
             lines = error_text.split('\n')
             for line in lines:
                 if line.strip():
-                    # En web: con símbolo
-                    formatted_line = f"✗ {line}"
+                    formatted_line = f"[ERROR] {line}"
                     self.current_session_logs.append(formatted_line)
                     if len(self.current_session_logs) > MAX_LOG_LINES:
                         self.current_session_logs.pop(0)
                     
-                    # En archivo: sin símbolo
                     log_entry = f"[{timestamp}] {line}"
                     with open(LOG_FILE, 'a', encoding='utf-8') as f:
                         f.write(log_entry + '\n')
@@ -731,20 +836,17 @@ class WebServer(ServerScript):
             logger.error(f"Error escribiendo error: {e}")
     
     def get_current_session_logs(self):
-        """Obtener logs solo de la sesión actual"""
+        """Obtener logs solo de la sesion actual"""
         return list(self.current_session_logs)
     
     def clear_all_logs(self):
-        """Limpiar archivo de logs completamente y regenerar marcador de sesión"""
+        """Limpiar archivo de logs completamente y regenerar marcador de sesion"""
         try:
-            # Vaciar archivo completamente
             with open(LOG_FILE, 'w', encoding='utf-8') as f:
                 f.write('')
             
-            # Regenerar marcador de sesión actual
             self._write_session_marker()
             
-            # Limpiar sesión actual también
             self.current_session_logs = []
         except Exception as e:
             logger.error(f"Error limpiando logs: {e}")
@@ -770,7 +872,9 @@ class WebServer(ServerScript):
     
     def on_unload(self):
         """Se ejecuta cuando se descarga el script"""
+        global _web_server_instance
         try:
+            _web_server_instance = None
             if hasattr(self, 'http_server'):
                 self.http_server.shutdown()
         except Exception as e:
