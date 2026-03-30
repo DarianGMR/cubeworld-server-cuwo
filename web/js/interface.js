@@ -4,7 +4,7 @@ $(document).ready(function () {
         1: "Guerrero",
         2: "Ranger",
         3: "Mago",
-        4: "Pícaro"
+        4: "Picaro"
     };
     
     const Specializations = [
@@ -20,11 +20,16 @@ $(document).ready(function () {
     let selectedPlayerId = null;
     let selectedUnbanIp = null;
     let previousPlayerIds = new Set();
+    let lastChatMessageCount = 0;
+    let chatStatusShown = false;
+    let chatInitialized = false;
+    let currentTab = 'players';
     
     // ============= TAB SWITCHING =============
     $('.nav-item').on('click', function(e) {
         e.preventDefault();
         const tabName = $(this).data('tab');
+        currentTab = tabName;
         
         $('.nav-item').removeClass('active');
         $('.tab-content').removeClass('active');
@@ -32,9 +37,15 @@ $(document).ready(function () {
         $(this).addClass('active');
         $('#' + tabName).addClass('active');
         
-        // Actualizar bans cuando se cambia a la pestaña
+        // Actualizar bans cuando se cambia a la pestana
         if (tabName === 'bans') {
             updateBans();
+        }
+        
+        // Cargar chat cuando se cambia a esa pestana
+        if (tabName === 'chat' && !chatInitialized) {
+            loadChatHistory();
+            chatInitialized = true;
         }
     });
     
@@ -83,12 +94,12 @@ $(document).ready(function () {
                 const currentPlayerIds = new Set(data.players.map(p => p.id));
                 const disconnectedIds = new Set([...previousPlayerIds].filter(id => !currentPlayerIds.has(id)));
                 
-                // Remover jugadores desconectados con animaci��n
+                // Remover jugadores desconectados con animacion
                 disconnectedIds.forEach(playerId => {
                     $(`#playersContainer .player-item[data-player-id="${playerId}"]`).fadeOut(300, function() {
                         $(this).remove();
                         
-                        // Si la lista está vacía, mostrar empty-state
+                        // Si la lista esta vacia, mostrar empty-state
                         if (playersContainer.find('.player-item').length === 0) {
                             playersContainer.html(`
                                 <div class="empty-state">
@@ -138,7 +149,7 @@ $(document).ready(function () {
                                     $value.text(player.hp + ' HP');
                                 } else if (labelText.includes('especialidad')) {
                                     $value.text(spec);
-                                } else if (labelText.includes('posición')) {
+                                } else if (labelText.includes('posicion')) {
                                     $value.text(`X:${player.x || 0}`);
                                 } else if (labelText.includes('tiempo de juego')) {
                                     $value.text(playtimeStr);
@@ -170,7 +181,7 @@ $(document).ready(function () {
                                                 <span class="player-detail-value">${player.hp} HP</span>
                                             </div>
                                             <div class="player-detail-item">
-                                                <span class="player-detail-label">Posición</span>
+                                                <span class="player-detail-label">Posicion</span>
                                                 <span class="player-detail-value">X:${player.x || 0}</span>
                                             </div>
                                             <div class="player-detail-item">
@@ -249,14 +260,14 @@ $(document).ready(function () {
                     // Crear set de IPs actuales en el servidor
                     const serverIps = new Set(data.bans.map(b => b.ip));
                     
-                    // Remover bans que ya no existen con animación
+                    // Remover bans que ya no existen con animacion
                     bansContainer.find('.ban-item').each(function() {
                         const ip = $(this).data('ban-ip');
                         if (!serverIps.has(ip)) {
                             $(this).fadeOut(300, function() {
                                 $(this).remove();
                                 
-                                // Si la lista está vacía después de remover, mostrar empty-state
+                                // Si la lista esta vacia despues de remover, mostrar empty-state
                                 if (bansContainer.find('.ban-item').length === 0) {
                                     bansContainer.html(`
                                         <div class="empty-state">
@@ -274,16 +285,16 @@ $(document).ready(function () {
                         const existingBan = bansContainer.find(`.ban-item[data-ban-ip="${ban.ip}"]`);
                         
                         if (existingBan.length > 0) {
-                            // Actualizar ban existente solo si cambió algo
+                            // Actualizar ban existente solo si cambio algo
                             const currentName = existingBan.find('.ban-name').text();
                             const currentReason = existingBan.find('.ban-detail-value:last').text();
                             
-                            if (currentName !== (ban.name || 'Desconocido') || currentReason !== (ban.reason || 'Sin razón')) {
+                            if (currentName !== (ban.name || 'Desconocido') || currentReason !== (ban.reason || 'Sin razon')) {
                                 existingBan.find('.ban-name').text(ban.name || 'Desconocido');
-                                existingBan.find('.ban-detail-value:last').text(ban.reason || 'Sin razón');
+                                existingBan.find('.ban-detail-value:last').text(ban.reason || 'Sin razon');
                             }
                         } else {
-                            // Agregar nuevo ban CON animación
+                            // Agregar nuevo ban CON animacion
                             const banItem = `
                                 <div class="ban-item" data-ban-ip="${ban.ip}" style="animation: slideUp 0.5s ease;">
                                     <div class="ban-avatar">
@@ -297,8 +308,8 @@ $(document).ready(function () {
                                                 <span class="ban-detail-value">${ban.ip}</span>
                                             </div>
                                             <div class="ban-detail-item">
-                                                <span class="ban-detail-label">Razón</span>
-                                                <span class="ban-detail-value">${ban.reason || 'Sin razón'}</span>
+                                                <span class="ban-detail-label">Razon</span>
+                                                <span class="ban-detail-value">${ban.reason || 'Sin razon'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -388,7 +399,7 @@ $(document).ready(function () {
                     const errorData = JSON.parse(xhr.responseText);
                     addConsoleMessage('error', `Error al sanar (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
                 } catch(e) {
-                    addConsoleMessage('error', `Error de conexión al sanar: HTTP ${xhr.status}`);
+                    addConsoleMessage('error', `Error de conexion al sanar: HTTP ${xhr.status}`);
                 }
                 console.error('Error details:', xhr);
             }
@@ -420,7 +431,7 @@ $(document).ready(function () {
                     const errorData = JSON.parse(xhr.responseText);
                     addConsoleMessage('error', `Error al desbanear (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
                 } catch(e) {
-                    addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
+                    addConsoleMessage('error', `Error de conexion: HTTP ${xhr.status}`);
                 }
                 console.error('Error details:', xhr);
                 updateBans();
@@ -431,7 +442,7 @@ $(document).ready(function () {
     $('#kickConfirmBtn').on('click', function() {
         const reason = $('#kickReason').val().trim();
         if (!reason) {
-            alert('Por favor, proporciona una razón');
+            alert('Por favor, proporciona una razon');
             return;
         }
         
@@ -450,7 +461,7 @@ $(document).ready(function () {
             }),
             success: function(response) {
                 if (response.success) {
-                    addConsoleMessage('success', `Jugador ${player.name} expulsado. Razón: ${reason}`);
+                    addConsoleMessage('success', `Jugador ${player.name} expulsado. Razon: ${reason}`);
                 } else {
                     addConsoleMessage('error', `No se pudo expulsar a ${player.name}: ${response.error || 'Error desconocido'}`);
                 }
@@ -462,7 +473,7 @@ $(document).ready(function () {
                     const errorData = JSON.parse(xhr.responseText);
                     addConsoleMessage('error', `Error al expulsar (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
                 } catch(e) {
-                    addConsoleMessage('error', `Error de conexión al expulsar: HTTP ${xhr.status}`);
+                    addConsoleMessage('error', `Error de conexion al expulsar: HTTP ${xhr.status}`);
                 }
                 console.error('Error details:', xhr);
             }
@@ -470,7 +481,7 @@ $(document).ready(function () {
     });
     
     $('#banConfirmBtn').on('click', function() {
-        const reason = $('#banReason').val().trim() || 'Sin razón especificada';
+        const reason = $('#banReason').val().trim() || 'Sin razon especificada';
         
         const player = playersData[selectedPlayerId];
         if (!player) return;
@@ -487,7 +498,7 @@ $(document).ready(function () {
             }),
             success: function(response) {
                 if (response.success) {
-                    addConsoleMessage('success', `Jugador ${player.name} baneado correctamente. IP: ${player.ip} Razón: ${reason}`);
+                    addConsoleMessage('success', `Jugador ${player.name} baneado correctamente. IP: ${player.ip} Razon: ${reason}`);
                 } else {
                     addConsoleMessage('warning', `${player.name} expulsado (no se pudo banear): ${response.error || 'Error desconocido'}`);
                 }
@@ -500,7 +511,7 @@ $(document).ready(function () {
                     const errorData = JSON.parse(xhr.responseText);
                     addConsoleMessage('error', `Error al banear (HTTP ${xhr.status}): ${errorData.error || 'Error desconocido'}`);
                 } catch(e) {
-                    addConsoleMessage('error', `Error de conexión al banear: HTTP ${xhr.status}`);
+                    addConsoleMessage('error', `Error de conexion al banear: HTTP ${xhr.status}`);
                 }
                 console.error('Error details:', xhr);
             }
@@ -550,35 +561,36 @@ $(document).ready(function () {
                 const currentLogLines = $('#consoleOutput .console-line:not(:contains("Servidor web conectado"))').length;
                 const totalLogs = data.logs.length;
                 
-                // Si hay más logs en el servidor, agregar solo los nuevos
+                // Si hay mas logs en el servidor, agregar solo los nuevos
                 if (totalLogs > currentLogLines) {
                     const newLogs = data.logs.slice(currentLogLines);
                     newLogs.forEach(logLine => {
-                        // Detectar símbolo inicial
+                        // Detectar simbolo inicial
                         let isError = false;
                         let displayLine = logLine;
                         
-                        if (logLine.startsWith('✗')) {
+                        if (logLine.startsWith('[ERROR]')) {
                             isError = true;
-                            displayLine = logLine.substring(1).trim();
-                        } else if (logLine.startsWith('✓')) {
-                            displayLine = logLine.substring(1).trim();
+                            displayLine = logLine.substring(7).trim();
+                        } else if (logLine.startsWith('[OK]')) {
+                            displayLine = logLine.substring(4).trim();
                         }
                         
-                        // Aplicar estilos según el símbolo
+                        // Aplicar estilos segun el simbolo
                         let symbolClass = isError ? 'console-error' : 'console-success';
                         let lineClass = isError ? 'console-line-error-command' : '';
+                        let symbol = isError ? '[ERROR]' : '[OK]';
                         
-                        // Detectar si tiene múltiples líneas
+                        // Detectar si tiene multiples lineas
                         const hasMultipleLines = displayLine.includes('\n');
                         
                         if (hasMultipleLines) {
                             // Usar pre para preservar formato
-                            const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span><pre class="console-pre">${escapeHtml(displayLine)}</pre></div>`;
+                            const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${symbol}</span><pre class="console-pre">${escapeHtml(displayLine)}</pre></div>`;
                             $('#consoleOutput').append(line);
                         } else {
                             // Formato normal
-                            const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span> ${escapeHtml(displayLine)}</div>`;
+                            const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${symbol}</span> ${escapeHtml(displayLine)}</div>`;
                             $('#consoleOutput').append(line);
                         }
                     });
@@ -607,32 +619,34 @@ $(document).ready(function () {
                     const existingLogs = $('#consoleOutput .console-line').length;
                     if (existingLogs <= 1) {
                         // Solo hay "Servidor web conectado", reemplazar con logs reales
+                        $('#consoleOutput').html('');
                         data.logs.forEach(logLine => {
-                            // Detectar símbolo inicial
+                            // Detectar simbolo inicial
                             let isError = false;
                             let displayLine = logLine;
                             
-                            if (logLine.startsWith('✗')) {
+                            if (logLine.startsWith('[ERROR]')) {
                                 isError = true;
-                                displayLine = logLine.substring(1).trim();
-                            } else if (logLine.startsWith('✓')) {
-                                displayLine = logLine.substring(1).trim();
+                                displayLine = logLine.substring(7).trim();
+                            } else if (logLine.startsWith('[OK]')) {
+                                displayLine = logLine.substring(4).trim();
                             }
                             
-                            // Aplicar estilos según el símbolo
+                            // Aplicar estilos segun el simbolo
                             let symbolClass = isError ? 'console-error' : 'console-success';
                             let lineClass = isError ? 'console-line-error-command' : '';
+                            let symbol = isError ? '[ERROR]' : '[OK]';
                             
-                            // Detectar si tiene múltiples líneas
+                            // Detectar si tiene multiples lineas
                             const hasMultipleLines = displayLine.includes('\n');
                             
                             if (hasMultipleLines) {
                                 // Usar pre para preservar formato
-                                const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span><pre class="console-pre">${escapeHtml(displayLine)}</pre></div>`;
+                                const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${symbol}</span><pre class="console-pre">${escapeHtml(displayLine)}</pre></div>`;
                                 $('#consoleOutput').append(line);
                             } else {
                                 // Formato normal
-                                const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${isError ? '✗' : '✓'}</span> ${escapeHtml(displayLine)}</div>`;
+                                const line = `<div class="console-line ${lineClass}"><span class="${symbolClass}">${symbol}</span> ${escapeHtml(displayLine)}</div>`;
                                 $('#consoleOutput').append(line);
                             }
                         });
@@ -658,25 +672,25 @@ $(document).ready(function () {
     }
     
     function addConsoleMessage(type, text) {
-        let symbolHTML = '<span class="console-success">✓</span>';
+        let symbolHTML = '<span class="console-success">[OK]</span>';
         let lineClass = '';
         
         if (type === 'error') {
-            symbolHTML = '<span class="console-error">✗</span>';
+            symbolHTML = '<span class="console-error">[ERROR]</span>';
             lineClass = 'console-line-error-command';
         } else if (type === 'warning') {
-            symbolHTML = '<span class="console-warning">⚠</span>';
+            symbolHTML = '<span class="console-warning">[WARN]</span>';
         }
         
-        // Detectar si necesita pre (múltiples líneas o contiene espacios alineados)
+        // Detectar si necesita pre (multiples lineas o contiene espacios alineados)
         const needsPre = text.includes('\n');
         
         if (needsPre) {
-            // Usar pre para preservar saltos de línea y espacios
+            // Usar pre para preservar saltos de linea y espacios
             const line = `<div class="console-line ${lineClass}">${symbolHTML}<pre class="console-pre">${escapeHtml(text)}</pre></div>`;
             $('#consoleOutput').append(line);
         } else {
-            // Formato normal para líneas simples
+            // Formato normal para lineas simples
             const line = `<div class="console-line ${lineClass}">${symbolHTML} ${escapeHtml(text)}</div>`;
             $('#consoleOutput').append(line);
         }
@@ -688,7 +702,7 @@ $(document).ready(function () {
         if (e.which === 13) {
             const command = $(this).val().trim();
             if (command) {
-                // NO agregar el comando todavía, esperar respuesta
+                // NO agregar el comando todavia, esperar respuesta
                 
                 $.ajax({
                     url: '/api/command',
@@ -700,14 +714,14 @@ $(document).ready(function () {
                         key: auth_key
                     }),
                     success: function(response) {
-                        // Ahora mostrar el comando con el símbolo correcto
+                        // Ahora mostrar el comando con el simbolo correcto
                         if (response.success) {
                             addConsoleMessage('success', '> ' + command);
                             if (response.output && response.output.trim()) {
                                 addConsoleMessage('success', response.output);
                             }
                         } else {
-                            // Error en comando - mostrar con símbolo de error
+                            // Error en comando - mostrar con simbolo de error
                             addConsoleMessage('error', '> ' + command);
                             if (response.error) {
                                 addConsoleMessage('error', response.error);
@@ -715,7 +729,7 @@ $(document).ready(function () {
                                 addConsoleMessage('error', 'Error desconocido ejecutando comando');
                             }
                         }
-                        // Actualizar logs después de ejecutar comando
+                        // Actualizar logs despues de ejecutar comando
                         setTimeout(updateConsoleLogs, 500);
                     },
                     error: function(xhr) {
@@ -725,7 +739,7 @@ $(document).ready(function () {
                             addConsoleMessage('error', `Error: ${errorData.error || 'Error desconocido'}`);
                         } catch(e) {
                             addConsoleMessage('error', '> ' + command);
-                            addConsoleMessage('error', `Error de conexión: HTTP ${xhr.status}`);
+                            addConsoleMessage('error', `Error de conexion: HTTP ${xhr.status}`);
                         }
                     }
                 });
@@ -751,12 +765,108 @@ $(document).ready(function () {
             }),
             success: function() {
                 hideModal('clearLogModal');
-                $('#consoleOutput').html('<div class="console-line"><span class="console-success">✓</span> Log limpiado</div>');
+                $('#consoleOutput').html('<div class="console-line"><span class="console-success">[OK]</span> Log limpiado</div>');
             }
         });
     });
     
     // ============= CHAT =============
+    
+    function checkChatStatus() {
+        $.ajax({
+            url: '/api/chat-status',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data && data.status) {
+                    // Agregar mensaje de estado si no existe
+                    if ($('#chatMessages .system-status').length === 0) {
+                        const statusMessage = `Chat ${data.status}`;
+                        const messageHtml = `<div class="chat-message system system-status"><span class="message-author">Sistema:</span> <span class="message-text">${escapeHtml(statusMessage)}</span></div>`;
+                        $('#chatMessages').prepend(messageHtml);
+                        chatStatusShown = true;
+                    }
+                }
+            },
+            error: function() {
+                // Silenciar errores
+            }
+        });
+    }
+    
+    function loadChatHistory() {
+        $.ajax({
+            url: '/api/chat',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (!data || !Array.isArray(data.messages)) {
+                    return;
+                }
+                
+                console.log('Chat history loaded:', data.messages.length, 'messages');
+                
+                // Limpiar chat actual solo si no tiene el mensaje de estado
+                if ($('#chatMessages .system-status').length === 0) {
+                    $('#chatMessages').html('');
+                    lastChatMessageCount = 0;
+                    
+                    // Mostrar estado del chat al inicio
+                    checkChatStatus();
+                }
+                
+                // Agregar todos los mensajes del historial
+                data.messages.forEach(msg => {
+                    if (msg && msg.name && msg.message) {
+                        // Si el nombre es "cuwo", cambiar el tipo a "user"
+                        const type = (msg.name === 'cuwo' || msg.name === 'Server') ? 'user' : 'system';
+                        addChatMessage(msg.name, msg.message, type);
+                        lastChatMessageCount++;
+                    }
+                });
+                
+                console.log('Total chat messages:', lastChatMessageCount);
+            },
+            error: function(xhr) {
+                console.error('Error loading chat history:', xhr.status);
+            }
+        });
+    }
+    
+    function updateChat() {
+        // Solo actualizar si estamos en la pestana de chat
+        if (currentTab !== 'chat') {
+            return;
+        }
+        
+        $.ajax({
+            url: '/api/chat',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (!data || !Array.isArray(data.messages)) {
+                    return;
+                }
+                
+                // Si hay mas mensajes que los que tenemos, agregar solo los nuevos
+                if (data.messages.length > lastChatMessageCount) {
+                    const newMessages = data.messages.slice(lastChatMessageCount);
+                    newMessages.forEach(msg => {
+                        if (msg && msg.name && msg.message) {
+                            // Si el nombre es "cuwo", cambiar el tipo a "user"
+                            const type = (msg.name === 'cuwo' || msg.name === 'Server') ? 'user' : 'system';
+                            addChatMessage(msg.name, msg.message, type);
+                        }
+                    });
+                    lastChatMessageCount = data.messages.length;
+                }
+            },
+            error: function() {
+                // Silenciar errores
+            }
+        });
+    }
+    
     $('#chatInput').on('keypress', function(e) {
         if (e.which === 13) {
             const message = $(this).val().trim();
@@ -772,6 +882,7 @@ $(document).ready(function () {
                     }),
                     success: function() {
                         addChatMessage('cuwo', message, 'user');
+                        lastChatMessageCount++;
                     },
                     error: function(xhr) {
                         addConsoleMessage('error', `Error al enviar mensaje: HTTP ${xhr.status}`);
@@ -788,19 +899,20 @@ $(document).ready(function () {
     });
     
     function addChatMessage(author, text, type = 'system') {
+        // Eliminar espacios excesivos del autor
+        author = author.trim();
+        text = text.trim();
+        
         let authorHtml = author;
-        if (author === 'cuwo') {
-            authorHtml = '<span class="message-author cuwo">cuwo:</span>';
+        if (author === 'cuwo' || author === 'Server') {
+            authorHtml = `<span class="message-author cuwo">${author}:</span>`;
         } else {
             authorHtml = `<span class="message-author">${author}:</span>`;
         }
         
-        const messageHtml = `
-            <div class="chat-message ${type}">
-                ${authorHtml}
-                <span class="message-text">${text}</span>
-            </div>
-        `;
+        // Formato compacto sin saltos de linea ni espacios excesivos
+        const messageHtml = `<div class="chat-message ${type}">${authorHtml} <span class="message-text">${escapeHtml(text)}</span></div>`;
+        
         $('#chatMessages').append(messageHtml);
         $('#chatMessages').scrollTop($('#chatMessages')[0].scrollHeight);
     }
@@ -812,11 +924,19 @@ $(document).ready(function () {
     updateConsoleLogs();
     loadInitialConsoleLogs();
     
+    // Cargar chat solo cuando se abre la pestaña por primera vez
+    const chatTab = $('.nav-item[data-tab="chat"]');
+    if (chatTab.hasClass('active')) {
+        loadChatHistory();
+        chatInitialized = true;
+    }
+    
     updateInterval = setInterval(() => {
         updatePlayers();
         updateServerInfo();
         updateBans();
         updateConsoleLogs();
+        updateChat();
     }, 5000);
     
     $(window).on('unload', function() {
