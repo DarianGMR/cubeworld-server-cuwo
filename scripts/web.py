@@ -390,53 +390,101 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                             self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
                             self.server.web_server.add_log_line_with_symbol(error_msg, "error")
                         else:
-                            # Capturar stdout/stderr
+                            # Capturar stdout/stderr para obtener TODOS los outputs
                             output_buffer = io.StringIO()
+                            error_buffer = io.StringIO()
                             
                             try:
-                                with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-                                    # Ejecutar comando
+                                # Ejecutar comando con captura de output
+                                with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
                                     result = server.call_command(script_interface, cmd_name, cmd_args)
                                 
-                                # Obtener output capturado
+                                # Obtener outputs capturados
                                 captured_output = output_buffer.getvalue().strip()
+                                captured_error = error_buffer.getvalue().strip()
                                 
-                                if result is not None:
-                                    response_msg["success"] = True
-                                    response_msg["output"] = str(result)
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
-                                    self.server.web_server.add_log_line_with_symbol(str(result), "success")
+                                # Procesar resultado
+                                if captured_error:
+                                    # Hubo error en stderr
+                                    response_msg["success"] = False
+                                    response_msg["error"] = captured_error
+                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                                    self.server.web_server.add_log_line_with_symbol(captured_error, "error")
+                                elif result is not None and str(result).strip():
+                                    # Comando retorna algo
+                                    result_str = str(result).strip()
+                                    
+                                    # Verificar si el resultado es un error basado en palabras clave
+                                    error_keywords = [
+                                        "Error:",
+                                        "error",
+                                        "Traceback",
+                                        "Jugador inválido",
+                                        "No existe",
+                                        "no encontrado",
+                                        "AttributeError",
+                                        "TypeError",
+                                        "ValueError",
+                                        "KeyError",
+                                        "Exception",
+                                        "failed",
+                                        "invalid",
+                                    ]
+                                    
+                                    is_error = any(keyword.lower() in result_str.lower() for keyword in error_keywords)
+                                    
+                                    if is_error:
+                                        response_msg["success"] = False
+                                        response_msg["error"] = result_str
+                                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                                        self.server.web_server.add_log_line_with_symbol(result_str, "error")
+                                    else:
+                                        response_msg["success"] = True
+                                        response_msg["output"] = result_str
+                                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
+                                        self.server.web_server.add_log_line_with_symbol(result_str, "success")
                                 elif captured_output:
+                                    # Hay output capturado (print statements)
                                     response_msg["success"] = True
                                     response_msg["output"] = captured_output
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "command")
+                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
                                     self.server.web_server.add_log_line_with_symbol(captured_output, "success")
                                 else:
+                                    # Comando ejecutado pero sin output
                                     response_msg["success"] = True
-                                    response_msg["output"] = ""
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "command")
+                                    response_msg["output"] = f"Comando '{cmd_name}' ejecutado correctamente"
+                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
+                                    self.server.web_server.add_log_line_with_symbol(f"Comando '{cmd_name}' ejecutado correctamente", "success")
                                     
                             except Exception as cmd_error:
+                                # Error DURANTE la ejecución del comando - capturar excepción completa
+                                error_type = type(cmd_error).__name__
                                 error_msg = str(cmd_error)
                                 error_trace = traceback.format_exc()
                                 
                                 response_msg["success"] = False
-                                response_msg["error"] = f"Error al ejecutar comando: {error_msg}\n\nTraceback:\n{error_trace}"
+                                response_msg["error"] = error_trace
                                 
-                                self.server.web_server.add_log_line_with_symbol(f"> {command}", "command")
-                                self.server.web_server.add_log_line_with_symbol(f"Error al ejecutar comando: {error_msg}", "error")
-                                self.server.web_server.add_log_line_with_symbol(f"Traceback:\n{error_trace}", "error")
+                                self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                                
+                                # Agregar traceback completo línea por línea
+                                for line in error_trace.split('\n'):
+                                    if line.strip():
+                                        self.server.web_server.add_log_line_with_symbol(line, "error")
                         
                     except Exception as e:
                         error_msg = str(e)
                         error_trace = traceback.format_exc()
                         
                         response_msg["success"] = False
-                        response_msg["error"] = f"Error al ejecutar comando: {error_msg}\n\nTraceback:\n{error_trace}"
+                        response_msg["error"] = error_trace
                         
-                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "command")
-                        self.server.web_server.add_log_line_with_symbol(f"Error al ejecutar comando: {error_msg}", "error")
-                        self.server.web_server.add_log_line_with_symbol(f"Traceback:\n{error_trace}", "error")
+                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                        
+                        # Agregar traceback completo línea por línea
+                        for line in error_trace.split('\n'):
+                            if line.strip():
+                                self.server.web_server.add_log_line_with_symbol(line, "error")
                     
             elif request == 'heal_player':
                 player_id = data.get('player_id')
