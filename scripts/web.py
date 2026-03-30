@@ -142,6 +142,9 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
         elif self.path == '/api/logs':
             self.handle_logs_api()
             return
+        elif self.path == '/api/chat-status':
+            self.handle_chat_status_api()
+            return
         super().do_GET()
     
     def do_POST(self):
@@ -161,6 +164,27 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.handle_chat_post(data)
         else:
             self.send_error(404, "Not Found")
+    
+    def handle_chat_status_api(self):
+        """Devolver estado del chat"""
+        global _web_server_instance
+        
+        status = "funcionando correctamente"
+        if _web_server_instance is None:
+            status = "no funcionando correctamente"
+        
+        response_data = {
+            'response': 'chat_status',
+            'status': status
+        }
+        
+        response = json.dumps(response_data, ensure_ascii=False)
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', len(response.encode('utf-8')))
+        self.end_headers()
+        self.wfile.write(response.encode('utf-8'))
     
     def handle_logs_api(self):
         """Devolver logs recientes desde archivo"""
@@ -374,7 +398,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                     server.send_chat(formatted_msg)
                     global _web_server_instance
                     if _web_server_instance is not None:
-                        _web_server_instance.add_chat_message('Server', formatted_msg)
+                        _web_server_instance.add_chat_message('cuwo', message)
                     response_msg["success"] = True
                     
             elif request == 'execute_command':
