@@ -627,7 +627,8 @@ html, body {
 .message-author {
     font-weight: 600;
     color: var(--info);
-    min-width: 80px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .message-author.cuwo {
@@ -636,6 +637,8 @@ html, body {
 
 .message-text {
     color: var(--text-primary);
+    word-break: break-word;
+    flex: 1;
 }
 
 .chat-input-wrapper {
