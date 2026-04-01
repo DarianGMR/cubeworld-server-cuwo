@@ -2,7 +2,7 @@
 server_name = 'CubeWorld CubanPlay'
 
 # Numero máximo de jugadores en el servidor simultaneamente.
-max_players = 4
+max_players = 40
 
 # Semilla para el servidor
 seed = 26879
@@ -13,13 +13,13 @@ time_modifier = 1.0
 # Lista de scripts que se ejecutaran en el servidor al iniciar.
 # Considera activar los siguientes dos scripts: pvp y ctf.
 scripts = ['log', 'ddos', 'commands', 'welcome', 'ban', 'console',
-           'anticheat', 'pvp', 'web']
+           'anticheat', 'web']
 
 # Contraseñas utilizadas para la gestion de permisos. Las claves son contraseñas y los valores son:
 # una lista de tipos de usuario asociados a esa contraseña. Actualmente, solo esta definido el tipo 'admin',
 # pero los scripts pueden restringir su uso segun el tipo de usuario.
 passwords = {
-    'PASSWORDREPLACEME': ['admin']
+    '7ad5mi3n1cu5w9o0': ['admin']
 }
 
 # Utilizado por el script welcome.py. Envia un breve mensaje de bienvenida a los usuarios
@@ -41,7 +41,7 @@ world_debug_info = False
 profile_file = None
 
 # Numero maximo de conexiones por IP para evitar ataques DoS.
-max_connections_per_ip = 2
+max_connections_per_ip = 10
 
 # Tiempo de espera de conexion en segundos
 connection_timeout = 10.0
@@ -81,7 +81,7 @@ max_distance = 0x10000 * 128
 
 # Distancia a la que el servidor reduce la tasa de envio de PNJ y criaturas.
 # Por defecto, 50 bloques.
-max_reduce_distance = 0x10000 * 50
+max_reduce_distance = 0x10000 * 128
 reduce_skip = 8 # sends only every 8th packet
 
 # Directorio de guardado de datos para almacenar, por ejemplo, informacion sobre prohibiciones.
