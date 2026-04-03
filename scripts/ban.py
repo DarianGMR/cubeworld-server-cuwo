@@ -28,12 +28,13 @@ class BanServer(ServerScript):
         """Guardar lista de IPs baneadas"""
         self.server.save_data(IP_BAN_DATA, self.banned_ips)
 
-    def ban_ip(self, ip, reason, player_name=None):
-        """Banea una IP y guarda el nombre del jugador"""
-        # Guardar como dict con nombre y razón
+    def ban_ip(self, ip, reason, player_name=None, ban_by='administrador'):
+        """Banea una IP y guarda el nombre del jugador y quien lo banea"""
+        # Guardar como dict con nombre, razón y quien lo banea
         self.banned_ips[ip] = {
             'reason': reason,
-            'name': player_name or 'Desconocido'
+            'name': player_name or 'Desconocido',
+            'banned_by': ban_by  # 'administrador' o 'anticheat'
         }
         self.save_bans()
         
@@ -50,7 +51,7 @@ class BanServer(ServerScript):
             banned_players.append(connection)
             
             if name is not None:
-                message = IP_BANNED.format(ip=ip, reason=reason, name=name)
+                message = IP_BANNED.format(name=name, reason=reason)
                 print(message)
                 self.server.send_chat(message)
         
@@ -83,6 +84,13 @@ class BanServer(ServerScript):
             return ban_data.get('name', 'Desconocido')
         return 'Desconocido'
 
+    def get_ban_by(self, ip):
+        """Obtiene quien banea al jugador"""
+        ban_data = self.banned_ips.get(ip, {})
+        if isinstance(ban_data, dict):
+            return ban_data.get('banned_by', 'administrador')
+        return 'administrador'
+
     def on_connection_attempt(self, event):
         """Verifica si la IP está baneada ANTES de conectar"""
         ip = event.address[0]
@@ -113,8 +121,8 @@ def ban(script, name, *reason):
     ip = player.address[0]
     player_name = player.name
     
-    # Banear la IP (ahora con el nombre del jugador)
-    script.parent.ban_ip(ip, reason_str, player_name)
+    # Banear la IP (ahora con el nombre del jugador y marcar como administrador)
+    script.parent.ban_ip(ip, reason_str, player_name, ban_by='administrador')
     
     return f'IP {ip} del jugador "{player_name}" baneada correctamente. Razón: {reason_str}'
 
