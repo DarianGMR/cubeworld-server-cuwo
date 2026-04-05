@@ -45,6 +45,15 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Lista de palabras clave que NO deben aparecer en la consola web (solo son logs de inicio)
+STARTUP_LOG_KEYWORDS = [
+    'Script activado',
+    'Script desactivado',
+    'cuwo funcionando en el puerto',
+    'Abriendo navegador en',
+    '(using uvloop)'
+]
+
 
 class WebLogCapture(logging.StreamHandler):
     """Capturar todos los logs incluyendo print()"""
@@ -562,7 +571,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                             
                             if ban_script:
                                 # Pasar ban_by='administrador' para marcar como admin
-                                ban_script.ban_ip(player_ip, reason, player_name, ban_by='administrador')
+                                ban_script.ban_ip(player_ip, reason, player_name, ban_by='administrador', send_message=True)
                                 response_msg["success"] = True
                                 self.server.web_server.add_log_line_with_symbol(f"[BAN] Jugador {player_name} baneado por IP {player_ip}. Razon: {reason}", "success")
                             else:
@@ -649,9 +658,8 @@ class WebServer(ServerScript):
             # Escribir marcador de sesion de chat
             self.session_start_marker = self._write_chat_session_marker()
             
-            # Parchar el sistema de chat
+            # Parchar el sistema de chat Y logging
             self._patch_chat_system()
-            # NO llamar a _setup_logging_hook() - ya no es necesario
             
             if not os.path.exists(SITE_PATH):
                 logger.error(f"Carpeta '{SITE_PATH}' no encontrada")
@@ -686,64 +694,44 @@ class WebServer(ServerScript):
         except Exception as e:
             logger.error(f"Error inicializando servidor web: {e}\n{traceback.format_exc()}")
     
-    def _setup_logging_hook(self):
-        """Configura un hook para capturar logs - SOLO UNA VEZ"""
-        # Este método ahora está vacío porque el patching de print es suficiente
-        pass
-        
-        # Crear un handler personalizado que capture logs
-        class ConsoleLogCapture(logging.Handler):
-            def __init__(self, web_server):
-                super().__init__()
-                self.web_server = web_server
-            
-            def emit(self, record):
-                try:
-                    msg = self.format(record)
-                    self.web_server.add_log_line(msg)
-                except Exception:
-                    self.handleError(record)
-        
-        # Agregar handler a los loggers principales
-        handler = ConsoleLogCapture(self)
-        handler.setFormatter(logging.Formatter('%(message)s'))
-        logging.getLogger().addHandler(handler)
-        logging.getLogger('cuwo').addHandler(handler)
-    
     def _patch_chat_system(self):
-        """Reemplazar print() con una version que guarde en consola.log una ÚNICA vez"""
+        """Reemplazar print() con una version que guarde en chat.log y consola.log"""
         import builtins
         
         original_print = builtins.print
         web_server = self
         
-        # Conjunto para evitar duplicados (almacena hash del mensaje)
-        printed_messages = set()
-        
         def patched_print(*args, **kwargs):
-            """Print parcheado que captura mensajes sin duplicados"""
+            """Print parcheado que captura mensajes de chat y consola"""
             # Convertir args a string
             if args:
                 message_str = ' '.join(str(arg) for arg in args)
             else:
                 message_str = ''
             
-            # Crear hash del mensaje para detectar duplicados
-            msg_hash = hash(message_str)
-            
-            # Llamar al print original SIEMPRE
+            # Llamar al print original
             original_print(*args, **kwargs)
             
-            # Agregar a consola web SOLO si no está duplicado
-            if msg_hash not in printed_messages and message_str.strip():
-                printed_messages.add(msg_hash)
+            # Filtrar logs de inicio que no deben aparecer en la consola web
+            should_skip_console = any(keyword in message_str for keyword in STARTUP_LOG_KEYWORDS)
+            
+            # Agregar a consola web SOLO si no es un log de inicio
+            if not should_skip_console:
                 web_server.add_log_line(message_str)
             
             # Intentar extraer el mensaje de chat si tiene el formato "nombre: mensaje"
             # PERO EXCLUIR mensajes del anticheat y logs del sistema
             if ':' in message_str and len(message_str) > 3:
                 # Excluir mensajes que contienen caracteres especiales del sistema
-                if not any(x in message_str for x in ['[', ']', '(', ')', 'anticheat', 'Jugador', 'cuwo anti-cheat', 'Script', 'Se recibieron', 'cambio de nombre', 'IP', 'Tu IP', 'Razon', 'fue baneado', 'expulsado', 'conectado', 'desconectado']):
+                exclude_keywords = [
+                    '[', ']', '(', ')', 'anticheat', 'Jugador', 'cuwo anti-cheat', 
+                    'Script', 'Se recibieron', 'cambio de nombre', 'IP', 'Tu IP', 
+                    'Razon', 'fue baneado', 'expulsado', 'conectado', 'desconectado',
+                    'Deteniendo', 'funcionando', 'navegador', 'uvloop', 'activado',
+                    'desactivado'
+                ]
+                
+                if not any(x in message_str for x in exclude_keywords):
                     parts = message_str.split(':', 1)
                     if len(parts) == 2:
                         player_name = parts[0].strip()
