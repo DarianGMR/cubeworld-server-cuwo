@@ -902,10 +902,6 @@ $(document).ready(function () {
         }
     });
     
-    $('#chatSendBtn').on('click', function() {
-        $('#chatInput').trigger('keypress');
-    });
-    
     function addChatMessage(author, text, type = 'system') {
         // Eliminar espacios excesivos del autor
         author = author.trim();
