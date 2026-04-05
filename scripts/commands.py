@@ -164,10 +164,25 @@ def whereis(script, name=None):
 def pm(script, name, *message):
     """Envia un mensaje privado a un jugador."""
     player = script.get_player(name)
-    message = ' '.join(message)
-    player.send_chat('%s (PM): %s' % (script.connection.name, message))
-    response = ('%s (PM): %s'  % (script.connection.name, message))
-    print(response)
+    message_text = ' '.join(message)
+    
+    sender_name = script.connection.name
+    receiver_name = player.name
+    
+    # Mensaje que recibe el jugador que envía el PM (el que ejecuta el comando)
+    sender_message = f"yo (pm-{receiver_name}): {message_text}"
+    
+    # Mensaje que recibe el jugador que recibe el PM
+    receiver_message = f"{sender_name} (pm): {message_text}"
+    
+    # Mostrar en consola del sender
+    print(f"{sender_name} (pm-{receiver_name}): {message_text}")
+    
+    # Enviar mensaje privado al receptor
+    player.send_chat(receiver_message)
+    
+    # Respuesta para la consola/web (lo que ve quien ejecutó el comando)
+    response = sender_message
     return response
 
 
