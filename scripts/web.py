@@ -66,6 +66,10 @@ PLAYER_MESSAGE_KEYWORDS = [
     'ha sido baneado'
 ]
 
+# Variable para evitar duplicar prints en la consola web
+_command_execution_active = False
+_suppress_next_print = False
+
 
 class WebLogCapture(logging.StreamHandler):
     """Capturar todos los logs incluyendo print()"""
@@ -403,6 +407,8 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
     
     def handle_command(self, data):
         """Procesar comandos desde la web"""
+        global _command_execution_active
+        
         server = self.server.web_server.server
         auth_key = self.server.web_server.auth_key
         
@@ -439,15 +445,17 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                             error_msg = f"Comando invalido: '{cmd_name}' no existe"
                             response_msg["success"] = False
                             response_msg["error"] = error_msg
-                            self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
-                            self.server.web_server.add_log_line_with_symbol(error_msg, "error")
+                            self.server.web_server.add_log_line(f"> {command}")
+                            self.server.web_server.add_log_line(error_msg)
                         else:
                             output_buffer = io.StringIO()
                             error_buffer = io.StringIO()
                             
                             try:
+                                _command_execution_active = True
                                 with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
                                     result = server.call_command(script_interface, cmd_name, cmd_args)
+                                _command_execution_active = False
                                 
                                 captured_output = output_buffer.getvalue().strip()
                                 captured_error = error_buffer.getvalue().strip()
@@ -455,8 +463,8 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                 if captured_error:
                                     response_msg["success"] = False
                                     response_msg["error"] = captured_error
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
-                                    self.server.web_server.add_log_line_with_symbol(captured_error, "error")
+                                    self.server.web_server.add_log_line(f"> {command}")
+                                    self.server.web_server.add_log_line(captured_error)
                                 elif result is not None and str(result).strip():
                                     result_str = str(result).strip()
                                     
@@ -481,25 +489,26 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     if is_error:
                                         response_msg["success"] = False
                                         response_msg["error"] = result_str
-                                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
-                                        self.server.web_server.add_log_line_with_symbol(result_str, "error")
+                                        self.server.web_server.add_log_line(f"> {command}")
+                                        self.server.web_server.add_log_line(result_str)
                                     else:
                                         response_msg["success"] = True
                                         response_msg["output"] = result_str
-                                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
-                                        self.server.web_server.add_log_line_with_symbol(result_str, "success")
+                                        self.server.web_server.add_log_line(f"> {command}")
+                                        self.server.web_server.add_log_line(result_str)
                                 elif captured_output:
                                     response_msg["success"] = True
                                     response_msg["output"] = captured_output
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
-                                    self.server.web_server.add_log_line_with_symbol(captured_output, "success")
+                                    self.server.web_server.add_log_line(f"> {command}")
+                                    self.server.web_server.add_log_line(captured_output)
                                 else:
                                     response_msg["success"] = True
                                     response_msg["output"] = f"Comando '{cmd_name}' ejecutado correctamente"
-                                    self.server.web_server.add_log_line_with_symbol(f"> {command}", "success")
-                                    self.server.web_server.add_log_line_with_symbol(f"Comando '{cmd_name}' ejecutado correctamente", "success")
+                                    self.server.web_server.add_log_line(f"> {command}")
+                                    self.server.web_server.add_log_line(f"Comando '{cmd_name}' ejecutado correctamente")
                                     
                             except Exception as cmd_error:
+                                _command_execution_active = False
                                 error_type = type(cmd_error).__name__
                                 error_msg = str(cmd_error)
                                 error_trace = traceback.format_exc()
@@ -507,11 +516,11 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                 response_msg["success"] = False
                                 response_msg["error"] = error_trace
                                 
-                                self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                                self.server.web_server.add_log_line(f"> {command}")
                                 
                                 for line in error_trace.split('\n'):
                                     if line.strip():
-                                        self.server.web_server.add_log_line_with_symbol(line, "error")
+                                        self.server.web_server.add_log_line(line)
                         
                     except Exception as e:
                         error_msg = str(e)
@@ -520,11 +529,11 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         response_msg["success"] = False
                         response_msg["error"] = error_trace
                         
-                        self.server.web_server.add_log_line_with_symbol(f"> {command}", "error")
+                        self.server.web_server.add_log_line(f"> {command}")
                         
                         for line in error_trace.split('\n'):
                             if line.strip():
-                                self.server.web_server.add_log_line_with_symbol(line, "error")
+                                self.server.web_server.add_log_line(line)
                     
             elif request == 'heal_player':
                 player_id = data.get('player_id')
@@ -538,7 +547,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     entity.damage(-1000)
                                     response_msg["success"] = True
                                     msg = f"{connection.name} fue sanado"
-                                    self.server.web_server.add_log_line_with_symbol(f"[HEAL] {msg}", "success")
+                                    self.server.web_server.add_log_line(msg)
                                     server.send_chat(msg)
                                 else:
                                     response_msg["error"] = "Entidad sin metodo damage()"
@@ -558,7 +567,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         try:
                             connection.kick(reason)
                             response_msg["success"] = True
-                            self.server.web_server.add_log_line_with_symbol(f"[KICK] Jugador {connection.name} expulsado. Razon: {reason}", "success")
+                            self.server.web_server.add_log_line(f"Jugador {connection.name} expulsado. Razon: {reason}")
                         except Exception as e:
                             response_msg["error"] = str(e)
                     else:
@@ -582,10 +591,9 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     break
                             
                             if ban_script:
-                                # Pasar ban_by='administrador' para marcar como admin
                                 ban_script.ban_ip(player_ip, reason, player_name, ban_by='administrador', send_message=True)
                                 response_msg["success"] = True
-                                self.server.web_server.add_log_line_with_symbol(f"[BAN] Jugador {player_name} baneado por IP {player_ip}. Razon: {reason}", "success")
+                                self.server.web_server.add_log_line(f"Jugador {player_name} baneado por IP {player_ip}. Razon: {reason}")
                             else:
                                 response_msg["error"] = "Script de ban no encontrado"
                                     
@@ -610,7 +618,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                         if ban_script:
                             if ban_script.unban_ip(ip):
                                 response_msg["success"] = True
-                                self.server.web_server.add_log_line_with_symbol(f"[UNBAN] IP {ip} desbaneada", "success")
+                                self.server.web_server.add_log_line(f"IP {ip} desbaneada")
                                 server.send_chat(f"IP {ip} ha sido desbaneada")
                             else:
                                 response_msg["error"] = f"IP {ip} no encontrada en lista de baneados"
@@ -715,6 +723,8 @@ class WebServer(ServerScript):
         
         def patched_print(*args, **kwargs):
             """Print parcheado que captura mensajes de chat y consola"""
+            global _command_execution_active
+            
             # Convertir args a string
             if args:
                 message_str = ' '.join(str(arg) for arg in args)
@@ -730,6 +740,10 @@ class WebServer(ServerScript):
             # Filtrar mensajes de jugadores que no deben aparecer en consola
             is_player_message = ':' in message_str and not any(keyword in message_str for keyword in PLAYER_MESSAGE_KEYWORDS)
             
+            # NO agregar a consola web si está activa la ejecución de comandos (para evitar duplicados)
+            if _command_execution_active:
+                should_skip_console = True
+            
             # Agregar a consola web SOLO si no es un log de inicio ni es un mensaje de jugador puro
             if not should_skip_console and not is_player_message:
                 web_server.add_log_line(message_str)
@@ -743,7 +757,8 @@ class WebServer(ServerScript):
                     'Script', 'Se recibieron', 'cambio de nombre', 'IP', 'Tu IP', 
                     'Razon', 'fue baneado', 'expulsado', 'conectado', 'desconectado',
                     'Deteniendo', 'funcionando', 'navegador', 'uvloop', 'activado',
-                    'desactivado', 'asesinado', 'sanado', 'aturdido', 'baneada'
+                    'desactivado', 'asesinado', 'sanado', 'aturdido', 'baneada',
+                    '> ', 'PM)', 'Jugador'
                 ]
                 
                 if not any(x in message_str for x in exclude_keywords):
@@ -848,7 +863,7 @@ class WebServer(ServerScript):
             logger.error(f"Error escribiendo marcador de sesion: {e}")
     
     def add_log_line(self, line):
-        """Agregar linea de log con fecha/hora al archivo"""
+        """Agregar linea de log al archivo y memoria"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             log_entry = f"[{timestamp}] {line}"
@@ -862,27 +877,6 @@ class WebServer(ServerScript):
         except Exception as e:
             logger.error(f"Error escribiendo log: {e}")
     
-    def add_log_line_with_symbol(self, line, msg_type="info"):
-        """Agregar linea de log con simbolo en memoria, sin simbolo en archivo"""
-        try:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            if msg_type == "error":
-                symbol = "[ERROR]"
-            else:
-                symbol = "[OK]"
-            
-            formatted_line = f"{symbol} {line}"
-            self.current_session_logs.append(formatted_line)
-            if len(self.current_session_logs) > MAX_LOG_LINES:
-                self.current_session_logs.pop(0)
-            
-            log_entry = f"[{timestamp}] {symbol} {line}"
-            with open(LOG_FILE, 'a', encoding='utf-8') as f:
-                f.write(log_entry + '\n')
-        except Exception as e:
-            logger.error(f"Error escribiendo log: {e}")
-    
     def add_error_line(self, error_text):
         """Agregar linea de error con traceback completo"""
         try:
@@ -891,8 +885,7 @@ class WebServer(ServerScript):
             lines = error_text.split('\n')
             for line in lines:
                 if line.strip():
-                    formatted_line = f"[ERROR] {line}"
-                    self.current_session_logs.append(formatted_line)
+                    self.current_session_logs.append(line)
                     if len(self.current_session_logs) > MAX_LOG_LINES:
                         self.current_session_logs.pop(0)
                     
