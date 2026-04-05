@@ -28,8 +28,12 @@ class BanServer(ServerScript):
         """Guardar lista de IPs baneadas"""
         self.server.save_data(IP_BAN_DATA, self.banned_ips)
 
-    def ban_ip(self, ip, reason, player_name=None, ban_by='administrador'):
-        """Banea una IP y guarda el nombre del jugador y quien lo banea"""
+    def ban_ip(self, ip, reason, player_name=None, ban_by='administrador', send_message=True):
+        """Banea una IP y guarda el nombre del jugador y quien lo banea
+        
+        send_message: Si True, envía el mensaje de ban al jugador y a todos.
+                     Si False, solo desconecta (usado por anticheat)
+        """
         # Guardar como dict con nombre, razón y quien lo banea
         self.banned_ips[ip] = {
             'reason': reason,
@@ -45,12 +49,16 @@ class BanServer(ServerScript):
                 continue
             
             name = connection.name
-            if name is not None:
+            
+            # Solo enviar mensaje si no es por anticheat (anticheat envía su propio mensaje)
+            if send_message and name is not None:
                 connection.send_chat(SELF_BANNED_IP.format(reason=reason))
+            
             connection.disconnect()
             banned_players.append(connection)
             
-            if name is not None:
+            # Log en consola (solo si es por administrador)
+            if send_message and name is not None:
                 message = IP_BANNED.format(name=name, reason=reason)
                 print(message)
                 self.server.send_chat(message)
@@ -122,7 +130,7 @@ def ban(script, name, *reason):
     player_name = player.name
     
     # Banear la IP (ahora con el nombre del jugador y marcar como administrador)
-    script.parent.ban_ip(ip, reason_str, player_name, ban_by='administrador')
+    script.parent.ban_ip(ip, reason_str, player_name, ban_by='administrador', send_message=True)
     
     return f'IP {ip} del jugador "{player_name}" baneada correctamente. Razón: {reason_str}'
 
