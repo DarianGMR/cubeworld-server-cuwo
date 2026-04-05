@@ -26,7 +26,9 @@ def say(script, *message):
     """Envia un mensaje global al servidor."""
     message = ' '.join(message)
     script.server.send_chat(message)
-    return f"Mensaje enviado: {message}"
+    response = f"Mensaje enviado: {message}"
+    print(response)
+    return response
 
 
 @command
@@ -36,6 +38,7 @@ def server(script):
     revision = script.server.git_rev
     if revision is not None:
         msg += ', revision %s' % revision
+    print(msg)
     return msg
 
 
@@ -45,9 +48,11 @@ def login(script, password):
     password = password.lower()
     user_types = script.server.passwords.get(password, [])
     if not user_types:
-        return 'Contraseña no valida'
-    script.connection.rights.update(user_types)
-    return 'Iniciado sesion como %s' % (', '.join(user_types))
+        response = 'Contraseña no valida'
+    else:
+        response = 'Iniciado sesion como %s' % (', '.join(user_types))
+    print(response)
+    return response
 
 
 @command
@@ -124,7 +129,9 @@ def kick(script, name, *reason):
     reason = ' '.join(reason) or 'No se especifica ningun motivo'
     player = script.get_player(name)
     player.kick(reason)
-    return f"Jugador {player.name} expulsado. Razón: {reason}"
+    response = f"Jugador {player.name} expulsado. Razón: {reason}"
+    print(response)
+    return response
 
 
 @command
@@ -133,9 +140,11 @@ def setclock(script, value):
     """Establece la hora del dia. Formato: hh:mm."""
     try:
         script.server.set_clock(value)
+        response = 'Reloj configurado en %s' % value
     except ValueError:
-        return 'Reloj especificado no valido'
-    return 'Reloj configurado en %s' % value
+        response = 'Reloj especificado no valido'
+    print(response)
+    return response
 
 
 @command
@@ -146,7 +155,9 @@ def whereis(script, name=None):
         message = 'estas en %s'
     else:
         message = '%s esta en %%s' % player.name
-    return message % (get_chunk(player.position),)
+    response = message % (get_chunk(player.position),)
+    print(response)
+    return response
 
 
 @command
@@ -155,7 +166,9 @@ def pm(script, name, *message):
     player = script.get_player(name)
     message = ' '.join(message)
     player.send_chat('%s (PM): %s' % (script.connection.name, message))
-    return 'PM enviado'
+    response = ('%s (PM): %s'  % (script.connection.name, message))
+    print(response)
+    return response
 
 
 @command
@@ -207,8 +220,9 @@ def heal(script, name=None, hp=1000):
     """Cura a un jugador en una cantidad especifica."""
     player = script.get_player(name)
     player.entity.damage(-int(hp))
-    message = '%s fue sanado' % player.name
-    return message
+    response = '%s fue sanado' % player.name
+    print(response)
+    return response
 
 
 def who_where(script, include_where):
@@ -231,13 +245,17 @@ def who_where(script, include_where):
 @command
 def who(script):
     """Lista de jugadores."""
-    return who_where(script, False)
+    response = who_where(script, False)
+    print(response)
+    return response
 
 
 @command
 def whowhere(script):
     """Enumera a los jugadores y sus ubicaciones."""
-    return who_where(script, True)
+    response = who_where(script, True)
+    print(response)
+    return response
 
 
 @command
@@ -249,7 +267,9 @@ def player(script, name):
     klass = constants.CLASS_NAMES[typ]
     spec = constants.CLASS_SPECIALIZATIONS[typ][entity.specialization]
     level = entity.level
-    return '%r es un nivel %s %s (%s)' % (player.name, level, klass, spec)
+    response = '%r es un nivel %s %s (%s)' % (player.name, level, klass, spec)
+    print(response)
+    return response
 
 
 @command
@@ -263,7 +283,9 @@ def addrights(script, player, *rights):
         rights = ', '.join((repr(right) for right in rights))
     else:
         rights = 'no'
-    return '%s derechos otorgados a %r' % (rights, player.name)
+    response = '%s derechos otorgados a %r' % (rights, player.name)
+    print(response)
+    return response
 
 
 @command
@@ -277,7 +299,9 @@ def removerights(script, player, *rights):
         rights = ', '.join((repr(right) for right in rights))
     else:
         rights = 'no'
-    return '%s derechos eliminados de %r' % (rights, player.name)
+    response = '%s derechos eliminados de %r' % (rights, player.name)
+    print(response)
+    return response
 
 
 @command
@@ -289,7 +313,9 @@ def rights(script, player=None):
         rights = ', '.join((repr(right) for right in player.rights))
     else:
         rights = 'no'
-    return '%r tiene %s derechos' % (player.name, rights)
+    response = '%r tiene %s derechos' % (player.name, rights)
+    print(response)
+    return response
 
 
 @command
@@ -298,10 +324,11 @@ def sound(script, name):
     """Reproduce un sonido global."""
     try:
         script.server.play_sound(name)
-        return f"Sonido '{name}' reproducido"
+        response = f"Sonido '{name}' reproducido"
     except KeyError:
-        return 'No hay tal sonido'
-
+        response = 'No hay tal sonido'
+    print(response)
+    return response
 
 def create_teleport_packet(pos, chunk_pos, user_id):
     packet = static.StaticEntityPacket()
@@ -362,9 +389,12 @@ def load(script, name):
     """Carga un script en tiempo de ejecucion."""
     name = str(name)
     if name in script.server.scripts:
-        return 'El script %r ya esta activado' % name
-    script.server.load_script(name)
-    return 'Script %r activado' % name
+        response = 'El script %r ya esta activado' % name
+    else:
+        script.server.load_script(name)
+        response = 'Script %r activado' % name
+    print(response)
+    return response
 
 
 @command
@@ -373,8 +403,11 @@ def unload(script, name):
     """Desactiva un script en tiempo de ejecucion."""
     name = str(name)
     if not script.server.unload_script(name):
-        return 'El script %r no esta activado' % name
-    return 'Script %r desactivado' % name
+        response = 'El script %r no esta activado' % name
+    else:
+        response = 'Script %r desactivado' % name
+    print(response)
+    return response
 
 
 @command
@@ -383,12 +416,17 @@ def reload(script, name):
     """Recarga un script en tiempo de ejecucion."""
     name = str(name)
     if not script.server.unload_script(name):
-        return 'El script %r no esta activado.' % name
-    script.server.load_script(name, update=True)
-    return 'Script %r recargado' % name
+        response = 'El script %r no esta activado.' % name
+    else:
+        script.server.load_script(name, update=True)
+        response = 'Script %r recargado' % name
+    print(response)
+    return response
 
 
 @command
 def scripts(script):
     """Muestra los scripts cargados actualmente."""
-    return 'Scripts: ' + ', '.join(script.server.scripts.items)
+    response = 'Scripts: ' + ', '.join(script.server.scripts.items)
+    print(response)
+    return response
