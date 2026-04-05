@@ -48,10 +48,22 @@ logger = logging.getLogger(__name__)
 # Lista de palabras clave que NO deben aparecer en la consola web (solo son logs de inicio)
 STARTUP_LOG_KEYWORDS = [
     'Script activado',
-    'Script desactivado',
     'cuwo funcionando en el puerto',
     'Abriendo navegador en',
     '(using uvloop)'
+]
+
+# Palabras clave que indican que es un mensaje de jugador
+PLAYER_MESSAGE_KEYWORDS = [
+    'PM):',  # Mensajes privados
+    'fue asesinado',
+    'fue sanado',
+    'fue aturdido',
+    'expulsado',
+    'fue baneado',
+    'baneada',
+    'desbaneada',
+    'ha sido baneado'
 ]
 
 
@@ -715,8 +727,11 @@ class WebServer(ServerScript):
             # Filtrar logs de inicio que no deben aparecer en la consola web
             should_skip_console = any(keyword in message_str for keyword in STARTUP_LOG_KEYWORDS)
             
-            # Agregar a consola web SOLO si no es un log de inicio
-            if not should_skip_console:
+            # Filtrar mensajes de jugadores que no deben aparecer en consola
+            is_player_message = ':' in message_str and not any(keyword in message_str for keyword in PLAYER_MESSAGE_KEYWORDS)
+            
+            # Agregar a consola web SOLO si no es un log de inicio ni es un mensaje de jugador puro
+            if not should_skip_console and not is_player_message:
                 web_server.add_log_line(message_str)
             
             # Intentar extraer el mensaje de chat si tiene el formato "nombre: mensaje"
@@ -728,7 +743,7 @@ class WebServer(ServerScript):
                     'Script', 'Se recibieron', 'cambio de nombre', 'IP', 'Tu IP', 
                     'Razon', 'fue baneado', 'expulsado', 'conectado', 'desconectado',
                     'Deteniendo', 'funcionando', 'navegador', 'uvloop', 'activado',
-                    'desactivado'
+                    'desactivado', 'asesinado', 'sanado', 'aturdido', 'baneada'
                 ]
                 
                 if not any(x in message_str for x in exclude_keywords):
@@ -739,7 +754,7 @@ class WebServer(ServerScript):
                         
                         # Validar que el nombre solo contiene caracteres validos (no es un log del sistema)
                         if player_name and all(c.isalnum() or c in ' -_' for c in player_name):
-                            if chat_message and len(player_name) < 50:  # Nombre no muy largo
+                            if chat_message and len(player_name) < 50 and len(chat_message) > 0:
                                 try:
                                     web_server.add_chat_message(player_name, chat_message)
                                 except Exception as e:
@@ -917,7 +932,7 @@ class WebServer(ServerScript):
         """Abrir navegador"""
         try:
             url = f"http://{host}:{port}"
-            logger.info(f"Abriendo navegador en {url}")
+            print(f"Abriendo navegador en {url}")
             webbrowser.open(url)
         except Exception as e:
             logger.warning(f"No se pudo abrir navegador: {e}\n{traceback.format_exc()}")
