@@ -170,13 +170,13 @@ def pm(script, name, *message):
     receiver_message = f"{sender_name} (pm): {message_text}"
     
     # Mostrar en consola del sender
-    print(f"{sender_name} (pm-{receiver_name}): {message_text}")
+    console_message = f"{sender_name} (pm-{receiver_name}): {message_text}"
     
     # Enviar mensaje privado al receptor
     player.send_chat(receiver_message)
     
     # Respuesta para la consola/web (lo que ve quien ejecutó el comando)
-    response = sender_message
+    response = console_message
     return response
 
 
