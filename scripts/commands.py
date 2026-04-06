@@ -170,13 +170,21 @@ def pm(script, name, *message):
     receiver_message = f"{sender_name} (pm): {message_text}"
     
     # Mostrar en consola cuwo y chat web
-    console_message = f"{sender_name} (pm-{receiver_name}): {message_text}"
+    console_message = f"{sender_name} (pm {receiver_name}): {message_text}"
     
     # Enviar mensaje privado al receptor
     player.send_chat(receiver_message)
     
-    # Imprimir para que aparezca en consola cuwo y se capture en chat web
+    # Imprimir para que aparezca en consola cuwo
     print(console_message)
+    
+    # Agregar directamente al chat web (sin duplicar en consola web)
+    try:
+        from scripts.web import _web_server_instance
+        if _web_server_instance is not None:
+            _web_server_instance.add_chat_message(sender_name, f"(pm {receiver_name}): {message_text}")
+    except:
+        pass
     
     response = sender_message
     return response
