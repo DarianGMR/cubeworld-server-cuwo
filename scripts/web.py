@@ -30,6 +30,9 @@ SESSION_MARKER = "=" * 80
 # Variable global para acceder a la instancia del WebServer
 _web_server_instance = None
 
+# Variable para controlar si estamos ejecutando comandos desde la web
+_executing_from_web = False
+
 # Crear carpeta de logs si no existe
 os.makedirs('logs', exist_ok=True)
 
@@ -65,10 +68,6 @@ PLAYER_MESSAGE_KEYWORDS = [
     'desbaneada',
     'ha sido baneado'
 ]
-
-# Variable para evitar duplicar prints en la consola web
-_command_execution_active = False
-_suppress_next_print = False
 
 
 class WebLogCapture(logging.StreamHandler):
@@ -407,7 +406,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
     
     def handle_command(self, data):
         """Procesar comandos desde la web"""
-        global _command_execution_active
+        global _executing_from_web
         
         server = self.server.web_server.server
         auth_key = self.server.web_server.auth_key
@@ -452,10 +451,10 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                             error_buffer = io.StringIO()
                             
                             try:
-                                _command_execution_active = True
+                                _executing_from_web = True
                                 with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
                                     result = server.call_command(script_interface, cmd_name, cmd_args)
-                                _command_execution_active = False
+                                _executing_from_web = False
                                 
                                 captured_output = output_buffer.getvalue().strip()
                                 captured_error = error_buffer.getvalue().strip()
@@ -508,7 +507,7 @@ class SiteHTTPRequestHandler(SimpleHTTPRequestHandler):
                                     self.server.web_server.add_log_line(f"Comando '{cmd_name}' ejecutado correctamente")
                                     
                             except Exception as cmd_error:
-                                _command_execution_active = False
+                                _executing_from_web = False
                                 error_type = type(cmd_error).__name__
                                 error_msg = str(cmd_error)
                                 error_trace = traceback.format_exc()
@@ -723,7 +722,7 @@ class WebServer(ServerScript):
         
         def patched_print(*args, **kwargs):
             """Print parcheado que captura mensajes de chat y consola"""
-            global _command_execution_active
+            global _executing_from_web
             
             # Convertir args a string
             if args:
@@ -740,8 +739,8 @@ class WebServer(ServerScript):
             # Filtrar mensajes de jugadores que no deben aparecer en consola
             is_player_message = ':' in message_str and not any(keyword in message_str for keyword in PLAYER_MESSAGE_KEYWORDS)
             
-            # NO agregar a consola web si está activa la ejecución de comandos (para evitar duplicados)
-            if _command_execution_active:
+            # NO agregar a consola web si está activa la ejecución de comandos desde web (para evitar duplicados)
+            if _executing_from_web:
                 should_skip_console = True
             
             # Agregar a consola web SOLO si no es un log de inicio ni es un mensaje de jugador puro
