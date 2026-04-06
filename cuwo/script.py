@@ -19,6 +19,8 @@ from cuwo.types import AttributeSet, AttributeDict
 import collections
 import sys
 import inspect
+import traceback
+import logging
 
 
 class InvalidPlayer(Exception):
@@ -363,9 +365,27 @@ class ServerScript(BaseScript):
             ret = 'Jugador invalido especificado'
         except InsufficientRights:
             ret = 'Derechos insuficientes'
-        except Exception:
-            import traceback
-            traceback.print_exc()
+        except Exception as e:
+            # Capturar el traceback completo
+            error_trace = traceback.format_exc()
+            
+            # Imprimir en consola cuwo
+            print(error_trace)
+            
+            # Enviar también a la consola web
+            try:
+                # Obtener la instancia del web server
+                web_server = None
+                for script in self.server.scripts.get():
+                    if hasattr(script, 'add_error_line'):
+                        web_server = script
+                        break
+                
+                if web_server is not None:
+                    web_server.add_error_line(error_trace)
+            except Exception:
+                pass
+            
             ret = ''
         return ret
 
