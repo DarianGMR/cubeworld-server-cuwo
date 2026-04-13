@@ -369,24 +369,16 @@ class ServerScript(BaseScript):
             # Capturar el traceback completo
             error_trace = traceback.format_exc()
             
-            # Imprimir en consola cuwo SOLO si no viene de la web
-            # Esto evita que se muestre dos veces (una desde print_exc y otra desde add_error_line)
-            print(error_trace)
+            # Verificar si se ejecuta desde la web
+            from scripts.web import _executing_from_web
             
-            # Enviar también a la consola web (sin duplicar mediante print)
-            try:
-                web_server = None
-                for script in self.server.scripts.get():
-                    if hasattr(script, 'add_error_line'):
-                        web_server = script
-                        break
-                
-                if web_server is not None:
-                    web_server.add_error_line(error_trace)
-            except Exception:
-                pass
+            # Imprimir en consola cuwo SOLO si NO viene de la web
+            # Esto evita que se muestre dos veces en la consola web
+            if not _executing_from_web:
+                print(error_trace)
             
-            ret = ''
+            # Retornar el traceback para que sea procesado por call_command del web
+            ret = error_trace
         return ret
 
 
